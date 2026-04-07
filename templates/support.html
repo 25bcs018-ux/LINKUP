@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkUp • Support</title>
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LinkUp" />
+  <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='support.css') }}" />
+</head>
+<body class="bg-animated">
+  <div class="support-page">
+    <div class="support-shell">
+      <header class="support-top">
+        <a class="brand" href="{{ url_for('chats') }}" aria-label="Back to chats">
+          <span class="logo" aria-hidden="true"></span>
+          <span>LINKUP</span>
+        </a>
+        <div class="top-actions">
+          <a class="btn" href="{{ url_for('chats') }}">Back</a>
+          <a class="btn danger" href="{{ url_for('logout') }}">Logout</a>
+        </div>
+      </header>
+
+      <main class="support-grid">
+        <section class="card">
+          <h1>Support & FAQ</h1>
+          <p class="muted">Quick answers + a way to contact support without leaving the app.</p>
+
+          <div class="faq">
+            <details open>
+              <summary>Why can’t I message someone?</summary>
+              <p>You can only message users who accepted your contact request. Open Chats → Menu → Requests to accept or resend.</p>
+            </details>
+            <details>
+              <summary>Are messages encrypted?</summary>
+              <p>Messages are encrypted at rest in the database (server-side) so raw DB content isn’t readable. This is not end-to-end encryption between devices.</p>
+            </details>
+            <details>
+              <summary>How do profile photos work?</summary>
+              <p>Your photo is stored on the server under <span class="mono">static/avatars/</span> and referenced from your account record.</p>
+            </details>
+            <details>
+              <summary>How do I change my name/about/password?</summary>
+              <p>In Chats open Menu → Settings. Edit Profile changes your display name/about. Your Account lets you update email/password or delete your account.</p>
+            </details>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Contact support</h2>
+          <p class="muted">Submit a ticket. You’ll see your recent tickets below.</p>
+
+          {% if ok %}
+            <div class="notice ok">{{ ok }}</div>
+          {% endif %}
+          {% if error %}
+            <div class="notice error">{{ error }}</div>
+          {% endif %}
+
+          <form method="POST" action="{{ url_for('support') }}" class="support-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <div class="field">
+              <label class="label" for="category">Category</label>
+              <select class="input" id="category" name="category" required>
+                <option value="general">General</option>
+                <option value="account">Account</option>
+                <option value="messages">Messages</option>
+                <option value="contacts">Contacts</option>
+                <option value="bug">Bug report</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label class="label" for="subject">Subject</label>
+              <input class="input" id="subject" name="subject" maxlength="80" required placeholder="What do you need help with?" />
+            </div>
+
+            <div class="field">
+              <label class="label" for="message">Message</label>
+              <textarea class="input textarea" id="message" name="message" maxlength="1200" required placeholder="Describe the issue and what you expected..."></textarea>
+            </div>
+
+            <div class="actions">
+              <button class="btn green" type="submit">Submit ticket</button>
+              <a class="btn" href="{{ url_for('chats') }}">Back to chats</a>
+            </div>
+          </form>
+
+          <div class="tickets">
+            <h3>Your recent tickets</h3>
+            {% if tickets and tickets|length %}
+              <div class="ticket-list">
+                {% for t in tickets %}
+                  <div class="ticket">
+                    <div class="ticket-top">
+                      <strong>{{ t.subject }}</strong>
+                      <span class="badge">{{ t.status }}</span>
+                    </div>
+                    <div class="muted2">{{ t.category }} • {{ t.created_at.isoformat() }}Z</div>
+                    <p>{{ t.message }}</p>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="hint">No tickets yet.</div>
+            {% endif %}
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+</body>
+</html>

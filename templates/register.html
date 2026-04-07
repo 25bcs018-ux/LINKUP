@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkUp • Create account</title>
+    <meta name="csrf-token" content="{{ csrf_token }}" />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LinkUp" />
+    <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
+    <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body class="bg-animated">
+    <div class="auth-page">
+        <div class="auth-shell">
+            <section class="auth-hero" aria-label="Create account">
+                <a class="brand" href="{{ url_for('front') }}" aria-label="LinkUp home">
+                    <span class="logo" aria-hidden="true"></span>
+                    <span>LINKUP</span>
+                </a>
+                <h1>Create your account</h1>
+                <p>Use a unique username. Once your friend accepts your request, you can start chatting like WhatsApp.</p>
+            </section>
+
+            <section class="auth-card" aria-label="Register form">
+                <h2>Register</h2>
+                <p class="sub">It’s free and takes a minute.</p>
+
+                {% if error %}
+                  <div class="notice error">{{ error }}</div>
+                {% endif %}
+
+                <form action="{{ url_for('register') }}" method="POST" style="margin-top: 10px;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <div class="field">
+                        <label class="label" for="username">Username</label>
+                                                <input class="input" type="text" id="username" name="username" required maxlength="15" minlength="3" placeholder="yourname" value="{{ prefill_username|default('')|e }}" />
+                                                <div class="helper" id="usernameHelper"></div>
+
+                                                {% if suggestions and suggestions|length %}
+                                                    <div class="suggestions" aria-label="Suggested usernames">
+                                                        <div class="suggestions-title">Available suggestions:</div>
+                                                        <div class="suggestions-list">
+                                                            {% for s in suggestions %}
+                                                                <button class="sug" type="button" data-suggest="{{ s|e }}">{{ s }}</button>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                {% else %}
+                                                    <div class="suggestions" id="usernameSuggestions" aria-label="Suggested usernames" style="display:none;">
+                                                        <div class="suggestions-title">Available suggestions:</div>
+                                                        <div class="suggestions-list" id="usernameSuggestionsList"></div>
+                                                    </div>
+                                                {% endif %}
+                    </div>
+
+                    <div class="field">
+                        <label class="label" for="email">Email</label>
+                        <input class="input" type="email" id="email" name="email" required placeholder="you@example.com" value="{{ prefill_email|default('')|e }}" />
+                    </div>
+
+                    <div class="field">
+                        <label class="label" for="password">Password</label>
+                        <input class="input" type="password" id="password" name="password" required minlength="5" placeholder="Create a password" />
+                    </div>
+
+                    <div class="field">
+                        <label class="label" for="confirm_password">Confirm password</label>
+                        <input class="input" type="password" id="confirm_password" name="confirm_password" required minlength="5" placeholder="Repeat password" />
+                    </div>
+
+                    <div class="field">
+                        <label class="label" for="accept_terms">Legal</label>
+                        <label style="display:flex; gap:10px; align-items:flex-start; line-height:1.35; color: rgba(255,255,255,0.86);">
+                            <input type="checkbox" id="accept_terms" name="accept_terms" required style="margin-top:3px;" />
+                            <span>
+                                I agree to the <a href="{{ url_for('terms_and_conditions') }}" target="_blank" rel="noopener">Terms &amp; Conditions</a>
+                                and <a href="{{ url_for('privacy_policy') }}" target="_blank" rel="noopener">Privacy Policy</a>.
+                            </span>
+                        </label>
+                        <div class="helper">You must accept to create an account.</div>
+                    </div>
+
+                    <div class="auth-actions">
+                        <button class="btn primary" type="submit">Create account</button>
+                        <button class="btn ghost" type="reset">Clear</button>
+                    </div>
+                </form>
+
+                <div class="small-links">
+                    Already have an account? <a href="{{ url_for('login_page') }}">Sign in</a>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='register_suggest.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+</body>
+</html>

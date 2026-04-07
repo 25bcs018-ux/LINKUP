@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Create & Join</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #0f1819 0%, #1a1f2e 50%, #0f1916 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(79, 172, 254, 0.08) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(79, 172, 254, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card {
+            background: linear-gradient(135deg, #1a2332 0%, #222d3f 100%);
+            border-radius: 20px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6),
+                        0 0 1px rgba(79, 172, 254, 0.15),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            overflow: hidden;
+            border: 1px solid rgba(79, 172, 254, 0.12);
+            transition: all 0.5s cubic-bezier(0.23, 1, 0.320, 1);
+            backdrop-filter: blur(10px);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.7),
+                        0 0 1px rgba(79, 172, 254, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            border-color: rgba(79, 172, 254, 0.25);
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(15, 20, 25, 0.4);
+            border-bottom: 1px solid rgba(79, 172, 254, 0.1);
+            padding: 6px 8px;
+            gap: 4px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 14px 20px;
+            border: none;
+            background: transparent;
+            color: #7a8ba8;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+            position: relative;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            border-radius: 12px;
+        }
+
+        .tab-btn:hover {
+            color: #a8c5e0;
+            background: rgba(79, 172, 254, 0.08);
+        }
+
+        .tab-btn.active {
+            color: #4faaff;
+            background: rgba(79, 172, 254, 0.12);
+            box-shadow: 0 0 20px rgba(79, 172, 254, 0.15);
+        }
+
+        .form-content {
+            padding: 48px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            color: #8b9bbd;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            opacity: 0.95;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1.5px solid rgba(79, 172, 254, 0.15);
+            background: rgba(15, 20, 25, 0.6);
+            color: #e0e7f1;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+            font-family: inherit;
+            backdrop-filter: blur(4px);
+        }
+
+        input[type="text"]::placeholder,
+        input[type="password"]::placeholder {
+            color: #5a6577;
+        }
+
+        input[type="text"]:hover,
+        input[type="password"]:hover {
+            border-color: rgba(79, 172, 254, 0.3);
+            background: rgba(15, 20, 25, 0.8);
+            box-shadow: 0 0 12px rgba(79, 172, 254, 0.08);
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #4faaff;
+            background: rgba(15, 20, 25, 0.9);
+            box-shadow: 0 0 0 4px rgba(79, 172, 254, 0.2), 0 0 20px rgba(79, 172, 254, 0.15);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 28px;
+            padding: 14px 16px;
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.08) 0%, rgba(79, 172, 254, 0.04) 100%);
+            border-radius: 12px;
+            border: 1.5px solid rgba(79, 172, 254, 0.15);
+            transition: all 0.4s ease;
+        }
+
+        .checkbox-group:hover {
+            border-color: rgba(79, 172, 254, 0.25);
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.12) 0%, rgba(79, 172, 254, 0.08) 100%);
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #4faaff;
+            margin-right: 12px;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        input[type="checkbox"]:hover {
+            transform: scale(1.1);
+        }
+
+        .checkbox-label {
+            color: #a8c5e0;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+
+        .password-fields {
+            display: none;
+            animation: slideDown 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .password-fields.show {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .form-section {
+            display: none;
+        }
+
+        .form-section.active {
+            display: block;
+            animation: fadeIn 0.35s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        button.submit-btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #4faaff 0%, #0d7fb8 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+            margin-top: 8px;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button.submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.6s;
+        }
+
+        button.submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(79, 172, 254, 0.35);
+        }
+
+        button.submit-btn:hover::before {
+            left: 100%;
+        }
+
+        button.submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .form-title {
+            color: #4faaff;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 32px;
+            text-align: center;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #4faaff 0%, #7fd4ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .success-message {
+            display: none;
+            padding: 14px 16px;
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.12) 0%, rgba(79, 172, 254, 0.06) 100%);
+            border: 1.5px solid rgba(79, 172, 254, 0.3);
+            border-radius: 12px;
+            color: #4faaff;
+            text-align: center;
+            margin-bottom: 24px;
+            animation: slideDown 0.3s ease;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 600px) {
+            .form-content {
+                padding: 32px 24px;
+            }
+            
+            .container {
+                max-width: 100%;
+            }
+
+            button.submit-btn {
+                padding: 12px 20px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <!-- Tabs Header -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="create">Create</button>
+                <button class="tab-btn" data-tab="join">Join</button>
+            </div>
+
+            <!-- Form Content -->
+            <div class="form-content">
+                <!-- Create Form Section -->
+                <div class="form-section active" id="create-section">
+                    <div class="form-title">Create Room</div>
+                    <div class="success-message" id="create-success">Room created successfully!</div>
+                    
+                    <form id="create-form">
+                        <div class="form-group">
+                            <label for="create-userid">User ID</label>
+                            <input type="text" id="create-userid" placeholder="Enter your user ID" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="room-name">Room Name</label>
+                            <input type="text" id="room-name" placeholder="Enter room name" required>
+                        </div>
+
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="password-toggle">
+                            <label for="password-toggle" class="checkbox-label">Want to add password?</label>
+                        </div>
+
+                        <div class="password-fields" id="password-fields">
+                            <div class="form-group">
+                                <label for="create-password">Set Password</label>
+                                <input type="password" id="create-password" placeholder="Enter password">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="confirm-password">Confirm Password</label>
+                                <input type="password" id="confirm-password" placeholder="Confirm password">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="submit-btn">Create</button>
+                    </form>
+                </div>
+
+                <!-- Join Form Section -->
+                <div class="form-section" id="join-section">
+                    <div class="form-title">Join Room</div>
+                    <div class="success-message" id="join-success">Joined successfully!</div>
+                    
+                    <form id="join-form">
+                        <div class="form-group">
+                            <label for="join-userid">User ID</label>
+                            <input type="text" id="join-userid" placeholder="Enter your user ID" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="join-room-name">Room Name</label>
+                            <input type="text" id="join-room-name" placeholder="Enter room name" required>
+                        </div>
+
+                        <div class="password-fields" id="join-password-fields">
+                            <div class="form-group">
+                                <label for="join-password">Password</label>
+                                <input type="password" id="join-password" placeholder="Enter room password">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="submit-btn">Join</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let hasPassword = false;
+
+        // Tab switching functionality
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabName = this.dataset.tab;
+                
+                // Update active tab button
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                // Show/hide form sections
+                document.querySelectorAll('.form-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                
+                if (tabName === 'create') {
+                    document.getElementById('create-section').classList.add('active');
+                } else {
+                    document.getElementById('join-section').classList.add('active');
+                    // Show or hide password field in join based on hasPassword
+                    updateJoinPasswordField();
+                }
+            });
+        });
+
+        // Password toggle in Create form
+        document.getElementById('password-toggle').addEventListener('change', function() {
+            const passwordFields = document.getElementById('password-fields');
+            hasPassword = this.checked;
+
+            if (hasPassword) {
+                passwordFields.classList.add('show');
+                document.getElementById('create-password').required = true;
+                document.getElementById('confirm-password').required = true;
+            } else {
+                passwordFields.classList.remove('show');
+                document.getElementById('create-password').required = false;
+                document.getElementById('confirm-password').required = false;
+                document.getElementById('create-password').value = '';
+                document.getElementById('confirm-password').value = '';
+            }
+        });
+
+        // Update join password field visibility
+        function updateJoinPasswordField() {
+            const joinPasswordFields = document.getElementById('join-password-fields');
+            if (hasPassword) {
+                joinPasswordFields.classList.add('show');
+                document.getElementById('join-password').required = true;
+            } else {
+                joinPasswordFields.classList.remove('show');
+                document.getElementById('join-password').required = false;
+            }
+        }
+
+        // Create form submission
+        document.getElementById('create-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const userId = document.getElementById('create-userid').value;
+            const roomName = document.getElementById('room-name').value;
+            const password = document.getElementById('create-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            if (hasPassword && password !== confirmPassword) {
+                alert('Passwords do not match!');
+                return;
+            }
+
+            // Show success message
+            document.getElementById('create-success').style.display = 'block';
+            
+            console.log('[v0] Room created:', {
+                userId: userId,
+                roomName: roomName,
+                hasPassword: hasPassword
+            });
+
+            // Reset form
+            setTimeout(() => {
+                this.reset();
+                document.getElementById('password-toggle').checked = false;
+                document.getElementById('password-fields').classList.remove('show');
+                document.getElementById('create-success').style.display = 'none';
+            }, 2000);
+        });
+
+        // Join form submission
+        document.getElementById('join-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const userId = document.getElementById('join-userid').value;
+            const roomName = document.getElementById('join-room-name').value;
+            const password = hasPassword ? document.getElementById('join-password').value : null;
+
+            // Show success message
+            document.getElementById('join-success').style.display = 'block';
+            
+            console.log('[v0] Room joined:', {
+                userId: userId,
+                roomName: roomName,
+                hasPassword: hasPassword
+            });
+
+            // Reset form
+            setTimeout(() => {
+                this.reset();
+                document.getElementById('join-success').style.display = 'none';
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

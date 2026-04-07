@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>LinkUp Secure Link</title>
+    <meta name="csrf-token" content="{{ csrf_token }}" />
+    <meta name="description" content="Link page for LinkUp Secure." />
+    <meta name="theme-color" content="#06131a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LinkUp Secure" />
+    <link rel="manifest" href="{{ url_for('linkup_secure.secure_manifest') }}" />
+    <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+    <link rel="stylesheet" href="{{ url_for('linkup_secure.static', filename='secure.css') }}" />
+</head>
+<body>
+    <div class="page-shell link-shell">
+        <section class="link-container" aria-label="Link workspace">
+            <div class="link-card">
+                <div class="link-card-header">
+                    <div class="link-hero-mark">
+                        <span class="brand-mark link-page-mark" aria-hidden="true"></span>
+                        <div>
+                            <div class="badge">
+                                <span class="status-dot" aria-hidden="true"></span>
+                                <span>Link workspace</span>
+                            </div>
+                            <h1 class="link-page-title">Link</h1>
+                        </div>
+                    </div>
+                    <p class="link-intro">
+                        Create a secure chat or join an existing one from a single controlled workspace.
+                    </p>
+                </div>
+
+                <div class="link-tabs" role="tablist" aria-label="Link actions">
+                    <button class="link-tab active" type="button" data-tab="create" aria-selected="true">Create</button>
+                    <button class="link-tab" type="button" data-tab="join" aria-selected="false">Join</button>
+                </div>
+
+                <div class="link-form-content">
+                    <section class="link-panel active" id="create-panel" aria-label="Create chat">
+                        <div class="link-panel-title">Create Secure Chat</div>
+                        <div class="link-success" id="create-success">Chat created successfully.</div>
+
+                        <form id="create-form" class="link-form">
+                            <div class="link-field">
+                                <label for="create-user-id">User ID</label>
+                                <input type="text" id="create-user-id" placeholder="Enter your user ID" required>
+                            </div>
+
+                            <div class="link-field">
+                                <label for="create-chat-name">Chat Name</label>
+                                <input type="text" id="create-chat-name" placeholder="Enter a chat name" required>
+                            </div>
+
+                            <div class="link-toggle-row">
+                                <input type="checkbox" id="password-toggle">
+                                <label for="password-toggle" class="toggle-label">Protect this chat with a password</label>
+                            </div>
+
+                            <div class="password-stack" id="create-password-stack">
+                                <div class="link-field">
+                                    <label for="create-password">Password</label>
+                                    <input type="password" id="create-password" placeholder="Set a password">
+                                </div>
+
+                                <div class="link-field">
+                                    <label for="confirm-password">Confirm Password</label>
+                                    <input type="password" id="confirm-password" placeholder="Confirm the password">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="link-submit">Create</button>
+                        </form>
+                    </section>
+
+                    <section class="link-panel" id="join-panel" aria-label="Join chat">
+                        <div class="link-panel-title">Join Secure Chat</div>
+                        <div class="link-success" id="join-success">Access request prepared.</div>
+
+                        <form id="join-form" class="link-form">
+                            <div class="link-field">
+                                <label for="join-user-id">User ID</label>
+                                <input type="text" id="join-user-id" placeholder="Enter your user ID" required>
+                            </div>
+
+                            <div class="link-field">
+                                <label for="join-chat-name">Chat Name</label>
+                                <input type="text" id="join-chat-name" placeholder="Enter the chat name" required>
+                            </div>
+
+                            <button type="submit" class="link-submit">Join</button>
+                        </form>
+                    </section>
+                </div>
+
+                <div class="hero-actions">
+                    <a class="ghost-link large" href="{{ url_for('linkup_secure.home') }}">Back to LinkUp Secure</a>
+                </div>
+            </div>
+        </section>
+    </div>
+    <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+    <script>
+        (() => {
+            const csrfToken = (document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '').trim();
+            const _origFetch = window.fetch.bind(window);
+
+            function csrfFetch(input, init = {}) {
+                const options = init || {};
+                const method = String(options.method || 'GET').toUpperCase();
+                const headers = new Headers(options.headers || {});
+                if (csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+                    headers.set('X-CSRF-Token', csrfToken);
+                }
+                return _origFetch(input, { ...options, headers });
+            }
+
+            window.fetch = csrfFetch;
+
+            const createUrl = "{{ url_for('linkup_secure.api_create_chat') }}";
+            const joinUrl = "{{ url_for('linkup_secure.api_join_chat') }}";
+            const tabs = Array.from(document.querySelectorAll('.link-tab'));
+            const panels = {
+                create: document.getElementById('create-panel'),
+                join: document.getElementById('join-panel'),
+            };
+            const passwordToggle = document.getElementById('password-toggle');
+            const createPasswordStack = document.getElementById('create-password-stack');
+            const createPassword = document.getElementById('create-password');
+            const confirmPassword = document.getElementById('confirm-password');
+            const createSuccess = document.getElementById('create-success');
+            const joinSuccess = document.getElementById('join-success');
+
+            function flashMessage(node, message, isError = false) {
+                node.textContent = message;
+                node.classList.toggle('error', isError);
+                node.classList.add('show');
+                window.setTimeout(() => node.classList.remove('show'), 2200);
+            }
+
+            function setActiveTab(name) {
+                tabs.forEach((tab) => {
+                    const active = tab.dataset.tab === name;
+                    tab.classList.toggle('active', active);
+                    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+                });
+
+                Object.entries(panels).forEach(([panelName, panel]) => {
+                    panel.classList.toggle('active', panelName === name);
+                });
+            }
+
+            function syncPasswordState() {
+                const enabled = Boolean(passwordToggle.checked);
+                createPasswordStack.classList.toggle('show', enabled);
+                createPassword.required = enabled;
+                confirmPassword.required = enabled;
+                if (!enabled) {
+                    createPassword.value = '';
+                    confirmPassword.value = '';
+                }
+            }
+
+            tabs.forEach((tab) => {
+                tab.addEventListener('click', () => {
+                    setActiveTab(tab.dataset.tab);
+                });
+            });
+
+            passwordToggle.addEventListener('change', syncPasswordState);
+            syncPasswordState();
+
+            function describeError(error, fallback) {
+                switch (String(error || '')) {
+                    case 'payload_too_large':
+                        return 'That request was too large to process.';
+                    case 'server_error':
+                        return 'The server could not process that request.';
+                    default:
+                        return error ? String(error).replace(/_/g, ' ') : fallback;
+                }
+            }
+
+            async function parseApiResponse(resp) {
+                const body = await resp.text();
+                if (!body) {
+                    return {};
+                }
+                try {
+                    return JSON.parse(body);
+                } catch (_error) {
+                    if (resp.status === 413) {
+                        return { error: 'payload_too_large' };
+                    }
+                    return { error: resp.ok ? 'unexpected_response' : 'request_failed' };
+                }
+            }
+
+            document.getElementById('create-form').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (passwordToggle.checked && createPassword.value !== confirmPassword.value) {
+                    flashMessage(createSuccess, 'Passwords do not match.', true);
+                    return;
+                }
+
+                const payload = {
+                    user_id: document.getElementById('create-user-id').value.trim(),
+                    chat_name: document.getElementById('create-chat-name').value.trim(),
+                    protected: passwordToggle.checked,
+                    password: createPassword.value,
+                };
+
+                try {
+                    const resp = await fetch(createUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    const data = await parseApiResponse(resp);
+                    if (!resp.ok || !data.ok) {
+                        flashMessage(createSuccess, describeError(data.error, 'Could not create chat.'), true);
+                        return;
+                    }
+                    window.location.href = data.next_url;
+                } catch (_error) {
+                    flashMessage(createSuccess, 'Could not create chat.', true);
+                }
+            });
+
+            document.getElementById('join-form').addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                const basePayload = {
+                    user_id: document.getElementById('join-user-id').value.trim(),
+                    chat_name: document.getElementById('join-chat-name').value.trim(),
+                };
+
+                async function submitJoin(password = '') {
+                    const resp = await fetch(joinUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...basePayload, password }),
+                    });
+                    return { resp, data: await parseApiResponse(resp) };
+                }
+
+                try {
+                    let { resp, data } = await submitJoin();
+                    if (data.error === 'password_required') {
+                        const provided = window.prompt('Enter the chat password to continue:');
+                        if (!provided) {
+                            return;
+                        }
+                        ({ resp, data } = await submitJoin(provided));
+                    }
+
+                    if (!resp.ok || !data.ok) {
+                        flashMessage(joinSuccess, describeError(data.error, 'Could not join chat.'), true);
+                        return;
+                    }
+
+                    window.location.href = data.next_url;
+                } catch (_error) {
+                    flashMessage(joinSuccess, 'Could not join chat.', true);
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

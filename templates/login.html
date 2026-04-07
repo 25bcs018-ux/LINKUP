@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkUp • Sign in</title>
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LinkUp" />
+    <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
+    <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body class="bg-animated">
+    <div class="auth-page">
+        <div class="auth-shell">
+            <section class="auth-hero" aria-label="Welcome">
+                <a class="brand" href="{{ url_for('front') }}" aria-label="LinkUp home">
+                    <span class="logo" aria-hidden="true"></span>
+                    <span>LINKUP</span>
+                </a>
+                <h1>Welcome back</h1>
+                <p>Sign in to start chatting with your contacts. New here? Create an account in under a minute.</p>
+            </section>
+
+            <section class="auth-card" aria-label="Sign in form">
+                <h2>Sign in</h2>
+                <p class="sub">Use your LinkUp username or email and password.</p>
+
+                {% if error %}
+                  <div class="notice error">{{ error }}</div>
+                {% endif %}
+                {% if ok %}
+                  <div class="notice ok">{{ ok }}</div>
+                {% endif %}
+
+                <form action="{{ url_for('login') }}" method="POST" style="margin-top: 10px;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                    <div class="field">
+                        <label class="label" for="username">Username or email</label>
+                        <input class="input" type="text" id="username" name="username" autocomplete="username" required maxlength="120" minlength="3" placeholder="yourname or you@example.com" />
+                    </div>
+
+                    <div class="field">
+                        <label class="label" for="password">Password</label>
+                        <input class="input" type="password" id="password" name="password" autocomplete="current-password" required maxlength="80" minlength="5" placeholder="••••••••" />
+                    </div>
+
+                    <div class="auth-actions">
+                        <button class="btn primary" type="submit">Sign in</button>
+                        <button class="btn ghost" type="reset">Clear</button>
+                    </div>
+                </form>
+
+                <div style="margin-top: 14px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <a class="btn" href="{{ url_for('auth_google_start') }}" style="text-decoration:none;">Continue with Google</a>
+                </div>
+
+                <div class="small-links">
+                    Don’t have an account? <a href="{{ url_for('register_page') }}">Create one</a>
+                    <span style="opacity:0.6; margin: 0 8px;">•</span>
+                    <a href="{{ url_for('terms_and_conditions') }}" target="_blank" rel="noopener">Terms</a>
+                    <span style="opacity:0.6; margin: 0 8px;">•</span>
+                    <a href="{{ url_for('privacy_policy') }}" target="_blank" rel="noopener">Privacy</a>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+</body>
+</html>

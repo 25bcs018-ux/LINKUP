@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkUp • Email verification</title>
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body class="bg-animated">
+  <div class="auth-page">
+    <div class="auth-shell">
+      <section class="auth-hero" aria-label="Email verification">
+        <a class="brand" href="{{ url_for('front') }}" aria-label="LinkUp home">
+          <span class="logo" aria-hidden="true"></span>
+          <span>LINKUP</span>
+        </a>
+        <h1>Email verification</h1>
+        <p>Confirming your email helps keep accounts secure.</p>
+      </section>
+
+      <section class="auth-card" aria-label="Verification result">
+        {% if ok %}
+          <h2>Verified</h2>
+          <p class="sub">Your email is confirmed. You can sign in now.</p>
+          <div class="notice ok" style="margin-top: 10px;">Email verified successfully.</div>
+          <div class="auth-actions" style="margin-top: 12px;">
+            <a class="btn primary" href="{{ url_for('login') }}">Sign in</a>
+            <a class="btn ghost" href="{{ url_for('front') }}">Home</a>
+          </div>
+        {% else %}
+          <h2>Verification failed</h2>
+          <p class="sub">This link may be invalid or expired.</p>
+          <div class="notice error" style="margin-top: 10px;">{{ (error or 'Unable to verify email.')|e }}</div>
+          <div class="auth-actions" style="margin-top: 12px;">
+            <a class="btn primary" href="{{ url_for('login') }}">Back to sign in</a>
+            <a class="btn ghost" href="{{ url_for('front') }}">Home</a>
+          </div>
+        {% endif %}
+
+        <div class="small-links">
+          <a href="{{ url_for('terms_and_conditions') }}" target="_blank" rel="noopener">Terms</a>
+          <span style="opacity:0.6; margin: 0 8px;">•</span>
+          <a href="{{ url_for('privacy_policy') }}" target="_blank" rel="noopener">Privacy</a>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

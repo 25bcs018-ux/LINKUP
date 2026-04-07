@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkUp • Terms & Conditions</title>
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body class="bg-animated">
+  <div class="auth-page">
+    <div class="auth-shell">
+      <section class="auth-hero" aria-label="Terms and Conditions">
+        <a class="brand" href="{{ url_for('front') }}" aria-label="LinkUp home">
+          <span class="logo" aria-hidden="true"></span>
+          <span>LINKUP</span>
+        </a>
+        <h1>Terms &amp; Conditions</h1>
+        <p>Rules for using LinkUp.</p>
+      </section>
+
+      <section class="auth-card" aria-label="Terms content">
+        <h2>Agreement</h2>
+        <p class="sub">This is a basic terms template you can customize.</p>
+
+        <div style="display:grid; gap: 10px; margin-top: 12px; color: rgba(255,255,255,0.86);">
+          <h3 style="margin: 8px 0 0; font-size: 14px;">Using the service</h3>
+          <ul style="margin: 0; padding-left: 18px;">
+            <li>You are responsible for your account activity.</li>
+            <li>Do not misuse the service (spam, harassment, illegal content).</li>
+            <li>Do not attempt to break or bypass security.</li>
+          </ul>
+
+          <h3 style="margin: 8px 0 0; font-size: 14px;">Content</h3>
+          <ul style="margin: 0; padding-left: 18px;">
+            <li>You retain ownership of what you send.</li>
+            <li>You grant the app permission to store and process your content to provide chat features.</li>
+          </ul>
+
+          <h3 style="margin: 8px 0 0; font-size: 14px;">Termination</h3>
+          <ul style="margin: 0; padding-left: 18px;">
+            <li>We may restrict accounts that violate these terms.</li>
+            <li>You may delete your account (if enabled in your build).</li>
+          </ul>
+
+          <p style="margin: 8px 0 0; color: rgba(255,255,255,0.72); font-size: 12px;">
+            Last updated: 31 January 2026
+          </p>
+        </div>
+
+        <div class="small-links" style="margin-top: 14px;">
+          <a href="{{ url_for('register') }}">Back to Register</a>
+          <span style="opacity:0.6; margin: 0 8px;">•</span>
+          <a href="{{ url_for('privacy_policy') }}">Privacy Policy</a>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

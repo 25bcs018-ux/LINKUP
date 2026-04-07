@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkUp • Dashboard</title>
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LinkUp" />
+  <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
+</head>
+<body class="bg-animated">
+  <header>
+    <div class="wrap nav">
+      <a class="brand" href="{{ url_for('front') }}" aria-label="LinkUp home">
+        <span class="logo" aria-hidden="true"></span>
+        <span>LINKUP</span>
+      </a>
+
+      <div class="nav-right">
+        <span class="chip"><span class="dot" aria-hidden="true"></span> Signed in as <strong style="color: rgba(255,255,255,0.92)"> {{ username }} </strong></span>
+        <a class="btn" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap grid">
+      <aside class="panel" aria-label="Sidebar">
+        <div class="hd">
+          <strong>Profile</strong>
+          <span class="pill">Online</span>
+        </div>
+        <div class="bd">
+          <div class="profile">
+            <div class="avatar" aria-hidden="true"></div>
+            <div>
+              <div class="name">{{ username }}</div>
+              <div class="sub">Welcome back to LinkUp</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 14px;">
+            <input class="search" type="text" placeholder="Search chats or people…" disabled />
+          </div>
+
+          <div class="list" aria-label="Recent chats" style="margin-top: 14px;">
+            <div class="item">
+              <div class="meta">
+                <strong>Getting Started</strong>
+                <span>Tips to set up your chats</span>
+              </div>
+              <span class="pill">Pinned</span>
+            </div>
+            <div class="item">
+              <div class="meta">
+                <strong>Announcements</strong>
+                <span>New features coming soon</span>
+              </div>
+              <span class="pill">New</span>
+            </div>
+            <div class="item">
+              <div class="meta">
+                <strong>Friends</strong>
+                <span>Start a conversation</span>
+              </div>
+              <span class="pill">0 unread</span>
+            </div>
+          </div>
+
+          <div class="empty">This is a UI layout for after-login. Next step is wiring real chat data.</div>
+        </div>
+      </aside>
+
+      <section class="panel" aria-label="Main content">
+        <div class="hero">
+          <h1>Login successful. You’re in.</h1>
+          <p>
+            This is your post-login dashboard. From here you can open chats, manage your profile, and start new conversations.
+            If you want, I can hook this up to real chat rooms and message persistence next.
+          </p>
+        </div>
+
+        <div class="cards" aria-label="Quick actions">
+          <div class="card">
+            <strong>Start a chat</strong>
+            <p>Create a new conversation and invite a friend (UI placeholder).</p>
+          </div>
+          <div class="card">
+            <strong>Find people</strong>
+            <p>Search by username and send a message request (UI placeholder).</p>
+          </div>
+          <div class="card">
+            <strong>Account</strong>
+            <p>Update email/password, and manage sign-in security (UI placeholder).</p>
+          </div>
+        </div>
+
+        <div class="cta">
+          <a class="btn primary" href="#" onclick="return false;">Open chats</a>
+          <a class="btn" href="{{ url_for('front') }}">Back to landing</a>
+          <span style="color: var(--muted2); font-size: 13px;">(Chat functionality not implemented yet.)</span>
+        </div>
+
+        <div class="empty">Tip: Once you add a real chats page, we’ll route “Open chats” there.</div>
+      </section>
+    </div>
+  </main>
+  <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkUp • Chat, simplified</title>
+    <meta name="description" content="LinkUp is a simple, fast chat app. Create an account, sign in, and start messaging." />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LinkUp" />
+    <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
+    <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='front.css') }}" />
+</head>
+<body class="bg-animated">
+    <div class="page">
+        <header>
+            <div class="wrap nav">
+                <a class="brand" href="{{ url_for('login') }}" aria-label="LinkUp home">
+                    <span class="logo" aria-hidden="true"></span>
+                    <span>LINKUP</span>
+                </a>
+
+                <nav class="nav-links" aria-label="Primary">
+                    <a class="pill" href="{{ url_for('login_page') }}">Sign in</a>
+                    <a class="pill primary" href="{{ url_for('register_page') }}">Create account</a>
+                </nav>
+            </div>
+        </header>
+
+        <main>
+            <div class="wrap">
+                <section class="hero" aria-label="Intro">
+                    <div class="reveal">
+                        <div class="badge">
+                            <span class="dot" aria-hidden="true"></span>
+                            <span>Simple, fast chat for everyday conversations</span>
+                        </div>
+                        <h1>Chat with people you care about — instantly.</h1>
+                        <p class="lede">
+                            LinkUp keeps messaging clean and distraction‑free. Create an account, sign in, and start chatting.
+                            Built for speed, clarity, and a smooth experience on mobile and desktop.
+                        </p>
+                        <div class="cta">
+                            <a class="pill primary" href="{{ url_for('register_page') }}">Get started</a>
+                            <a class="pill" href="{{ url_for('login_page') }}">I already have an account</a>
+                            <small>It takes less than a minute.</small>
+                        </div>
+
+                        <div class="mini-features" aria-label="Highlights">
+                            <span class="chip">Clean UI</span>
+                            <span class="chip">Quick onboarding</span>
+                            <span class="chip">Responsive</span>
+                        </div>
+                    </div>
+
+                    <aside class="hero-card reveal" aria-label="Preview">
+                        <div class="mock">
+                            <div class="mock-top">
+                                <div class="mock-title">
+                                    <span class="logo" style="width: 28px; height: 28px; border-radius: 10px;"></span>
+                                    <span>LinkUp</span>
+                                </div>
+                                <div class="status">
+                                    <span class="dot" aria-hidden="true"></span>
+                                    <span>Online</span>
+                                </div>
+                            </div>
+                            <div class="bubble them">Hey! Welcome to LinkUp 👋</div>
+                            <div class="bubble you">Nice — this looks clean.</div>
+                            <div class="bubble them typing">Create an account to start chatting.</div>
+                            <div class="bubble you">On it.</div>
+                        </div>
+                    </aside>
+                </section>
+
+                <details class="details reveal" aria-label="How it works">
+                    <summary>How it works</summary>
+                    <div class="how">
+                        <div class="step">
+                            <div class="kicker"><span class="num">1</span> Register</div>
+                            <h3>Create your account</h3>
+                            <p>Choose a username, add your email, and set a password.</p>
+                        </div>
+                        <div class="step">
+                            <div class="kicker"><span class="num">2</span> Sign in</div>
+                            <h3>Access your chats</h3>
+                            <p>Use your credentials to sign in from any device.</p>
+                        </div>
+                        <div class="step">
+                            <div class="kicker"><span class="num">3</span> Start chatting</div>
+                            <h3>Talk in real time</h3>
+                            <p>Keep conversations going with a smooth, fast experience.</p>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </main>
+
+        <footer>
+            <div class="wrap footer-row">
+                <div>© 2026 LinkUp</div>
+                <div class="footer-links">
+                    <a class="footer-secure-link" href="{{ url_for('linkup_secure.home') }}">LinkUp Secure</a>
+                    <a href="{{ url_for('login_page') }}">Login</a>
+                    <a href="{{ url_for('register_page') }}">Register</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+    <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+</body>
+</html>

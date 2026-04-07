@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkUp • Privacy Policy</title>
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body class="bg-animated">
+  <div class="auth-page">
+    <div class="auth-shell">
+      <section class="auth-hero" aria-label="Privacy Policy">
+        <a class="brand" href="{{ url_for('front') }}" aria-label="LinkUp home">
+          <span class="logo" aria-hidden="true"></span>
+          <span>LINKUP</span>
+        </a>
+        <h1>Privacy Policy</h1>
+        <p>How LinkUp handles your information.</p>
+      </section>
+
+      <section class="auth-card" aria-label="Privacy policy content">
+        <h2>Summary</h2>
+        <p class="sub">This is a basic policy template you can customize.</p>
+
+        <div class="notice" style="margin-top: 10px;">
+          LinkUp stores your account details (username, email) and your messages in the app database. Messages are encrypted at rest by this app.
+        </div>
+
+        <div style="display:grid; gap: 10px; margin-top: 12px; color: rgba(255,255,255,0.86);">
+          <h3 style="margin: 8px 0 0; font-size: 14px;">What we collect</h3>
+          <ul style="margin: 0; padding-left: 18px;">
+            <li>Account data: username, email, and hashed password.</li>
+            <li>Profile data you add: display name, about, avatar.</li>
+            <li>Chat content you send (stored encrypted at rest).</li>
+            <li>Files you upload as chat attachments.</li>
+          </ul>
+
+          <h3 style="margin: 8px 0 0; font-size: 14px;">How we use it</h3>
+          <ul style="margin: 0; padding-left: 18px;">
+            <li>To provide the chat service (deliver messages, store your profile).</li>
+            <li>To prevent abuse and keep the service secure.</li>
+          </ul>
+
+          <h3 style="margin: 8px 0 0; font-size: 14px;">Your choices</h3>
+          <ul style="margin: 0; padding-left: 18px;">
+            <li>You can edit your profile in the app.</li>
+            <li>You can delete your account from the account menu (if enabled in your build).</li>
+          </ul>
+
+          <p style="margin: 8px 0 0; color: rgba(255,255,255,0.72); font-size: 12px;">
+            Last updated: 31 January 2026
+          </p>
+        </div>
+
+        <div class="small-links" style="margin-top: 14px;">
+          <a href="{{ url_for('register') }}">Back to Register</a>
+          <span style="opacity:0.6; margin: 0 8px;">•</span>
+          <a href="{{ url_for('terms_and_conditions') }}">Terms &amp; Conditions</a>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

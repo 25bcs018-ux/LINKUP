@@ -1,0 +1,19 @@
+{
+  "name": "LinkUp",
+  "short_name": "LinkUp",
+  "description": "LinkUp chat app for mobile and desktop browsers.",
+  "start_url": "/chats",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1025",
+  "theme_color": "#111b21",
+  "icons": [
+    {
+      "src": "/static/linkup_logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

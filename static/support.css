@@ -1,0 +1,53 @@
+:root{
+  --card: rgba(255,255,255,.06);
+  --stroke: rgba(255,255,255,.12);
+  --radius: 18px;
+}
+
+.support-page{min-height:100%;display:grid;place-items:center;padding:24px}
+.support-shell{width:min(1100px,100%);display:grid;gap:16px}
+
+.support-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  border-radius:var(--radius);
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(0,0,0,.12);
+}
+
+.top-actions{display:flex;gap:10px;flex-wrap:wrap}
+
+.support-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:16px}
+@media(max-width:920px){.support-grid{grid-template-columns:1fr}}
+
+.card{
+  border-radius:var(--radius);
+  border:1px solid rgba(255,255,255,.12);
+  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+  box-shadow:var(--shadow);
+  padding:18px;
+}
+
+.card h1{margin:0 0 8px;font-size:22px;letter-spacing:-.01em}
+.card h2{margin:0 0 8px;font-size:18px;letter-spacing:-.01em}
+
+.faq{display:grid;gap:10px;margin-top:14px}
+.faq details{border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.14);border-radius:14px;padding:10px 12px}
+.faq summary{cursor:pointer;font-weight:800;color:rgba(255,255,255,.88)}
+.faq p{margin:10px 0 0;color:rgba(255,255,255,.70);line-height:1.6}
+
+.support-form{margin-top:12px}
+.textarea{min-height:140px;resize:vertical}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+
+.tickets{margin-top:18px}
+.tickets h3{margin:0 0 10px;font-size:14px;color:rgba(255,255,255,.85)}
+.ticket-list{display:grid;gap:10px}
+.ticket{border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.14);border-radius:14px;padding:12px}
+.ticket-top{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.ticket p{margin:8px 0 0;color:rgba(255,255,255,.74);line-height:1.6}
+
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}

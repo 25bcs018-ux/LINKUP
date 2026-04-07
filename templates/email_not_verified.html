@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkUp • Verify your email</title>
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body class="bg-animated" data-username="{{ (username or '')|e }}" data-login-url="{{ url_for('login') }}" data-resend-url="{{ url_for('api_email_verify_otp_resend') }}" data-verify-url="{{ url_for('api_email_verify_otp_confirm') }}" data-dev-code="{{ (dev_code or '')|e }}">
+  <div class="auth-page">
+    <div class="auth-shell">
+      <section class="auth-hero" aria-label="Verify email">
+        <a class="brand" href="{{ url_for('front') }}" aria-label="LinkUp home">
+          <span class="logo" aria-hidden="true"></span>
+          <span>LINKUP</span>
+        </a>
+        <h1>Verify your email</h1>
+        <p>We sent a 6-digit OTP to your email. Enter it to activate your account.</p>
+      </section>
+
+      <section class="auth-card" aria-label="Email verification">
+        <h2>Almost there</h2>
+        <p class="sub">Your account is created, but it’s not activated yet.</p>
+
+        <div class="notice" style="margin-top: 10px;">
+          <div><strong>Status:</strong> Email not verified</div>
+          {% if username %}
+            <small>Account: {{ username|e }}</small>
+          {% endif %}
+        </div>
+
+        <div class="field" style="margin-top: 12px;">
+          <label class="label" for="otp">OTP</label>
+          <input class="input" type="text" id="otp" inputmode="numeric" maxlength="6" minlength="6" placeholder="123456" />
+          <div class="helper">Check your inbox (and spam). OTP expires in ~10 minutes.</div>
+        </div>
+
+        <div class="auth-actions" style="margin-top: 12px;">
+          <button class="btn primary" type="button" id="verifyBtn">Verify</button>
+          <button class="btn ghost" type="button" id="resendBtn">Resend OTP</button>
+        </div>
+
+        <div class="notice" id="devBox" style="margin-top: 12px; display:none;"></div>
+
+        <div class="small-links">
+          <a href="{{ url_for('terms_and_conditions') }}" target="_blank" rel="noopener">Terms</a>
+          <span style="opacity:0.6; margin: 0 8px;">•</span>
+          <a href="{{ url_for('privacy_policy') }}" target="_blank" rel="noopener">Privacy</a>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const root = document.body;
+    const username = (root?.dataset?.username || '').trim();
+    const loginUrl = (root?.dataset?.loginUrl || '/login').trim();
+    const resendUrl = (root?.dataset?.resendUrl || '/email/resend').trim();
+    const verifyUrl = (root?.dataset?.verifyUrl || '').trim();
+    const devCode = (root?.dataset?.devCode || '').trim();
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '').trim();
+    const btn = document.getElementById('resendBtn');
+    const verifyBtn = document.getElementById('verifyBtn');
+    const otpInput = document.getElementById('otp');
+
+    const devBox = document.getElementById('devBox');
+
+    function showDev(text) {
+      if (!devBox) return;
+      if (!text) return;
+      devBox.className = 'notice ok';
+      devBox.textContent = text;
+      devBox.style.display = '';
+    }
+
+    async function resend() {
+      if (!username) {
+        alert('Missing username. Please sign in again.');
+        window.location.href = loginUrl;
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        const res = await fetch(resendUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}) },
+          body: JSON.stringify({ username })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        if (data.dev_code) showDev('Dev mode OTP: ' + data.dev_code);
+        btn.textContent = 'Sent! Check your email';
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Resend OTP';
+        alert(e.message || 'Unable to resend');
+      }
+    }
+
+    async function verify() {
+      const code = (otpInput?.value || '').trim();
+      if (!code) return alert('Enter the OTP');
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Verifying…';
+      try {
+        const res = await fetch(verifyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}) },
+          body: JSON.stringify({ username, code })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        window.location.href = '/chats';
+      } catch (e) {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = 'Verify';
+        alert(e.message || 'Unable to verify');
+      }
+    }
+
+    btn?.addEventListener('click', resend);
+    verifyBtn?.addEventListener('click', verify);
+
+    if (devCode) showDev('Dev mode OTP: ' + devCode);
+  </script>
+</body>
+</html>

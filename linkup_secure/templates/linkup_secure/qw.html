@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>LinkUp Secure Chat</title>
+    <meta name="csrf-token" content="{{ csrf_token }}" />
+    <meta name="description" content="Temporary secure chat workspace for LinkUp Secure." />
+    <meta name="theme-color" content="#06131a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LinkUp Secure" />
+    <link rel="manifest" href="{{ url_for('linkup_secure.secure_manifest') }}" />
+    <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+    <link rel="stylesheet" href="{{ url_for('linkup_secure.static', filename='secure.css') }}" />
+</head>
+<body>
+    <div class="qw-shell" data-token="{{ token }}">
+        <section class="qw-chat-card" aria-label="Temporary secure chat">
+            <header class="qw-header">
+                <div>
+                    <div class="qw-chat-name" id="chatName">Secure Chat</div>
+                    <div class="qw-user-line" id="userLine">Preparing temporary session…</div>
+                </div>
+                <button class="qw-terminate-btn" id="terminateBtn" type="button">Terminate</button>
+            </header>
+
+            <div class="qw-status-banner" id="statusBanner">Temporary connection is loading.</div>
+
+            <div class="qw-messages" id="messagesArea"></div>
+
+            <div class="qw-empty-state" id="emptyState">
+                <div class="brand-mark link-page-mark" aria-hidden="true"></div>
+                <strong id="emptyTitle">Waiting</strong>
+                <p id="emptyText">This secure chat is waiting for the second participant.</p>
+            </div>
+
+            <footer class="qw-input-area">
+                <div class="qw-composer">
+                    <div class="qw-composer-top">
+                        <div class="qw-file-stack">
+                            <input type="file" id="fileInput" hidden>
+                            <button class="qw-file-btn" id="fileBtn" type="button" aria-label="Attach file">+</button>
+                            <div class="qw-file-pill" id="filePill" hidden>
+                                <span id="fileLabel"></span>
+                                <button class="qw-file-remove" id="fileRemove" type="button" aria-label="Remove attachment">x</button>
+                            </div>
+                        </div>
+                        <div class="qw-composer-hint">Enter to send. Shift+Enter for a new line.</div>
+                    </div>
+                    <div class="qw-composer-row">
+                        <textarea class="qw-message-input" id="messageInput" placeholder="Type a message..." rows="1"></textarea>
+                        <button class="qw-send-btn" id="sendBtn" type="button">Send</button>
+                    </div>
+                </div>
+            </footer>
+        </section>
+
+        <div class="qw-request-popup" id="requestPopup" hidden>
+            <div class="qw-request-title">Join request</div>
+            <div class="qw-request-copy" id="requestCopy"></div>
+            <div class="qw-request-actions">
+                <button class="ghost-link" id="rejectBtn" type="button">Reject</button>
+                <button class="primary-link" id="acceptBtn" type="button">Accept</button>
+            </div>
+        </div>
+
+        <div class="qw-idle-popup" id="idlePopup" hidden>
+            <div class="qw-idle-title">Automatic termination</div>
+            <div class="qw-idle-copy" id="idleCopy"></div>
+            <div class="qw-idle-countdown" id="idleCountdown">15s</div>
+            <div class="qw-idle-status" id="idleStatus"></div>
+            <div class="qw-idle-actions">
+                <button class="primary-link" id="remainBtn" type="button">Remain</button>
+            </div>
+        </div>
+    </div>
+
+    <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+
+    <script>
+        (() => {
+            const csrfToken = (document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '').trim();
+            const _origFetch = window.fetch.bind(window);
+
+            function csrfFetch(input, init = {}) {
+                const options = init || {};
+                const method = String(options.method || 'GET').toUpperCase();
+                const headers = new Headers(options.headers || {});
+                if (csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+                    headers.set('X-CSRF-Token', csrfToken);
+                }
+                return _origFetch(input, { ...options, headers });
+            }
+
+            window.fetch = csrfFetch;
+
+            const shell = document.querySelector('.qw-shell');
+            const token = shell?.dataset.token || '';
+            const chatName = document.getElementById('chatName');
+            const userLine = document.getElementById('userLine');
+            const statusBanner = document.getElementById('statusBanner');
+            const messagesArea = document.getElementById('messagesArea');
+            const emptyState = document.getElementById('emptyState');
+            const emptyTitle = document.getElementById('emptyTitle');
+            const emptyText = document.getElementById('emptyText');
+            const messageInput = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const terminateBtn = document.getElementById('terminateBtn');
+            const requestPopup = document.getElementById('requestPopup');
+            const requestCopy = document.getElementById('requestCopy');
+            const acceptBtn = document.getElementById('acceptBtn');
+            const rejectBtn = document.getElementById('rejectBtn');
+            const idlePopup = document.getElementById('idlePopup');
+            const idleCopy = document.getElementById('idleCopy');
+            const idleCountdown = document.getElementById('idleCountdown');
+            const idleStatus = document.getElementById('idleStatus');
+            const remainBtn = document.getElementById('remainBtn');
+            const fileInput = document.getElementById('fileInput');
+            const fileBtn = document.getElementById('fileBtn');
+            const filePill = document.getElementById('filePill');
+            const fileLabel = document.getElementById('fileLabel');
+            const fileRemove = document.getElementById('fileRemove');
+            const backUrl = "{{ url_for('linkup_secure.link') }}";
+            const activityUrl = "{{ url_for('linkup_secure.api_chat_activity', token='TOKEN') }}".replace('TOKEN', encodeURIComponent(token));
+            const remainUrl = "{{ url_for('linkup_secure.api_chat_remain', token='TOKEN') }}".replace('TOKEN', encodeURIComponent(token));
+            const terminateUrl = "{{ url_for('linkup_secure.api_chat_terminate', token='TOKEN') }}".replace('TOKEN', encodeURIComponent(token));
+
+            let sessionState = null;
+            let lastMessageId = 0;
+            let pollHandle = null;
+            let selectedAttachment = null;
+            let redirectHandle = null;
+            let renderedMessageIds = new Set();
+            let idlePromptState = null;
+            let idleCountdownHandle = null;
+            let lastActivityPingAt = 0;
+            let terminateInFlight = false;
+
+            function escapeText(value) {
+                return String(value ?? '');
+            }
+
+            function formatBytes(size) {
+                const value = Number(size) || 0;
+                if (value < 1024) {
+                    return `${value} B`;
+                }
+                if (value < 1024 * 1024) {
+                    return `${(value / 1024).toFixed(1)} KB`;
+                }
+                return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+            }
+
+            function setSelectedAttachment(attachment) {
+                selectedAttachment = attachment;
+                if (!attachment) {
+                    filePill.hidden = true;
+                    fileLabel.textContent = '';
+                    fileInput.value = '';
+                    return;
+                }
+                filePill.hidden = false;
+                fileLabel.textContent = `${attachment.name} • ${formatBytes(attachment.size)}`;
+            }
+
+            function autoSizeInput() {
+                messageInput.style.height = 'auto';
+                messageInput.style.height = `${Math.min(messageInput.scrollHeight, 180)}px`;
+            }
+
+            function attachmentUrl(attachment) {
+                return `data:${attachment.mime};base64,${attachment.data}`;
+            }
+
+            function renderAttachment(container, attachment) {
+                if (!attachment || !attachment.data) {
+                    return;
+                }
+
+                if (attachment.kind === 'image') {
+                    const img = document.createElement('img');
+                    img.className = 'qw-attachment-image';
+                    img.src = attachmentUrl(attachment);
+                    img.alt = attachment.name || 'Image attachment';
+                    container.appendChild(img);
+                }
+
+                const meta = document.createElement('a');
+                meta.className = 'qw-attachment-link';
+                meta.href = attachmentUrl(attachment);
+                meta.download = attachment.name || 'attachment';
+                meta.target = '_blank';
+                meta.rel = 'noopener noreferrer';
+                meta.textContent = `${attachment.name} • ${formatBytes(attachment.size)}`;
+                container.appendChild(meta);
+            }
+
+            function setInputEnabled(enabled, options = {}) {
+                const clearWhenDisabled = options.clearWhenDisabled !== false;
+                messageInput.disabled = !enabled;
+                sendBtn.disabled = !enabled;
+                fileBtn.disabled = !enabled;
+                fileRemove.disabled = !enabled;
+                if (!enabled && clearWhenDisabled) {
+                    messageInput.value = '';
+                    setSelectedAttachment(null);
+                }
+                autoSizeInput();
+            }
+
+            function setBanner(text) {
+                statusBanner.textContent = text;
+            }
+
+            function describeError(error, fallback = 'Something went wrong.') {
+                switch (String(error || '')) {
+                    case 'attachment_too_large':
+                    case 'payload_too_large':
+                        return 'Attachment must be 2 MB or smaller.';
+                    case 'invalid_attachment':
+                        return 'Attachment could not be processed.';
+                    case 'chat_not_connected':
+                        return 'This chat is not connected yet.';
+                    case 'idle_countdown_active':
+                        return 'Both participants must choose Remain before the countdown ends.';
+                    case 'session_not_found':
+                        return 'This secure session is no longer available.';
+                    case 'server_error':
+                        return 'The server could not process that request.';
+                    default:
+                        return error ? String(error).replace(/_/g, ' ') : fallback;
+                }
+            }
+
+            function stopIdleCountdown() {
+                if (idleCountdownHandle) {
+                    window.clearInterval(idleCountdownHandle);
+                    idleCountdownHandle = null;
+                }
+            }
+
+            function updateIdlePopup() {
+                if (!idlePromptState || !idlePromptState.active) {
+                    idlePopup.hidden = true;
+                    idleStatus.textContent = '';
+                    idleCountdown.textContent = '15s';
+                    stopIdleCountdown();
+                    return;
+                }
+
+                const secondsLeft = Math.max(0, Math.ceil(Number(idlePromptState.deadline_at || 0) - (Date.now() / 1000)));
+                idleCountdown.textContent = `${secondsLeft}s`;
+                idleCopy.textContent = 'No activity was detected for 5 minutes. Both participants must select Remain within 15 seconds to continue chatting.';
+
+                if (idlePromptState.own_remain) {
+                    remainBtn.disabled = true;
+                    idleStatus.textContent = idlePromptState.peer_remain
+                        ? 'Both participants selected Remain. Continuing chat...'
+                        : 'You selected Remain. Waiting for the other participant.';
+                } else {
+                    remainBtn.disabled = secondsLeft === 0;
+                    idleStatus.textContent = idlePromptState.peer_remain
+                        ? 'The other participant selected Remain. Select Remain now to continue the chat.'
+                        : 'The chat will terminate automatically unless both participants choose Remain.';
+                }
+
+                if (secondsLeft === 0) {
+                    remainBtn.disabled = true;
+                    idleStatus.textContent = 'Countdown finished. Terminating unless both confirmations were received.';
+                }
+            }
+
+            function renderIdlePrompt(idlePrompt) {
+                if (!idlePrompt || !idlePrompt.active) {
+                    idlePromptState = null;
+                    idlePopup.hidden = true;
+                    stopIdleCountdown();
+                    return;
+                }
+
+                idlePromptState = idlePrompt;
+                idlePopup.hidden = false;
+                updateIdlePopup();
+                if (!idleCountdownHandle) {
+                    idleCountdownHandle = window.setInterval(updateIdlePopup, 250);
+                }
+            }
+
+            async function pingActivity(force = false) {
+                if (!token || !sessionState || sessionState.status !== 'connected') {
+                    return;
+                }
+                if (sessionState.idle_prompt && sessionState.idle_prompt.active) {
+                    return;
+                }
+
+                const now = Date.now();
+                if (!force && (now - lastActivityPingAt) < 20000) {
+                    return;
+                }
+                lastActivityPingAt = now;
+
+                try {
+                    await postJson(activityUrl);
+                } catch (_error) {
+                    // Keep the client responsive even if the activity ping fails.
+                }
+            }
+
+            async function parseApiResponse(resp) {
+                const body = await resp.text();
+                if (!body) {
+                    return {};
+                }
+                try {
+                    return JSON.parse(body);
+                } catch (_error) {
+                    if (resp.status === 413) {
+                        return { error: 'payload_too_large' };
+                    }
+                    return { error: resp.ok ? 'unexpected_response' : 'request_failed' };
+                }
+            }
+
+            function scheduleRedirect() {
+                if (redirectHandle) {
+                    return;
+                }
+                redirectHandle = window.setTimeout(() => {
+                    window.location.href = backUrl;
+                }, 900);
+            }
+
+            function appendMessages(messages) {
+                if (!Array.isArray(messages) || messages.length === 0) {
+                    return;
+                }
+                let appendedAny = false;
+                messages.forEach((item) => {
+                    const messageId = Number(item.id) || 0;
+                    lastMessageId = Math.max(lastMessageId, messageId);
+                    if (messageId && renderedMessageIds.has(messageId)) {
+                        return;
+                    }
+                    if (messageId) {
+                        renderedMessageIds.add(messageId);
+                    }
+
+                    appendedAny = true;
+                    const row = document.createElement('div');
+                    row.className = `qw-message ${item.own ? 'own' : 'peer'}`;
+                    const bubble = document.createElement('div');
+                    bubble.className = 'qw-bubble';
+
+                    const author = document.createElement('div');
+                    author.className = 'qw-bubble-author';
+                    author.textContent = escapeText(item.sender_id);
+                    bubble.appendChild(author);
+
+                    if (item.content) {
+                        const body = document.createElement('div');
+                        body.textContent = escapeText(item.content);
+                        bubble.appendChild(body);
+                    }
+
+                    if (item.attachment) {
+                        renderAttachment(bubble, item.attachment);
+                    }
+
+                    row.appendChild(bubble);
+                    messagesArea.appendChild(row);
+                });
+                if (appendedAny) {
+                    emptyState.hidden = true;
+                    messagesArea.scrollTop = messagesArea.scrollHeight;
+                }
+            }
+
+            function renderState(data) {
+                sessionState = data;
+                chatName.textContent = data.chat_name || 'Secure Chat';
+                userLine.textContent = data.user_id ? `${data.user_id}${data.peer_id ? ` • connected with ${data.peer_id}` : ''}` : 'Temporary secure chat';
+                appendMessages(data.messages || []);
+
+                requestPopup.hidden = true;
+                renderIdlePrompt(data.idle_prompt || null);
+
+                if (data.status === 'connected') {
+                    emptyState.hidden = messagesArea.children.length > 0;
+                    emptyTitle.textContent = 'Connected';
+                    emptyText.textContent = 'Temporary secure connection is active.';
+                    if (data.idle_prompt && data.idle_prompt.active) {
+                        setBanner('Inactivity detected. Both participants must select Remain within 15 seconds to continue.');
+                        setInputEnabled(false, { clearWhenDisabled: false });
+                    } else {
+                        setBanner(data.protected ? 'Password-protected secure chat is active.' : 'Temporary secure chat is active.');
+                        setInputEnabled(true);
+                    }
+                } else if (data.status === 'waiting') {
+                    emptyState.hidden = false;
+                    emptyTitle.textContent = 'Waiting';
+                    emptyText.textContent = 'Waiting for another person to join this chat.';
+                    setBanner('Waiting for the second participant.');
+                    setInputEnabled(false);
+                    if (data.join_request && data.join_request.user_id) {
+                        requestCopy.textContent = `${data.join_request.user_id} wants to join this secure chat.`;
+                        requestPopup.hidden = false;
+                    }
+                } else if (data.status === 'pending') {
+                    emptyState.hidden = false;
+                    emptyTitle.textContent = 'Pending approval';
+                    emptyText.textContent = 'Waiting for the host to accept or reject your request.';
+                    setBanner('Join request sent.');
+                    setInputEnabled(false);
+                } else if (data.status === 'rejected') {
+                    emptyState.hidden = false;
+                    emptyTitle.textContent = 'Rejected';
+                    emptyText.textContent = 'Your request to join this chat was rejected.';
+                    setBanner('Join request rejected.');
+                    setInputEnabled(false);
+                } else if (data.status === 'terminated') {
+                    emptyState.hidden = false;
+                    emptyTitle.textContent = 'Terminated';
+                    emptyText.textContent = 'The temporary connection was terminated and all session data was removed.';
+                    setBanner('Temporary secure chat terminated. Returning to Link workspace...');
+                    renderIdlePrompt(null);
+                    setInputEnabled(false);
+                    if (pollHandle) {
+                        window.clearInterval(pollHandle);
+                    }
+                    scheduleRedirect();
+                }
+            }
+
+            async function loadState() {
+                if (!token) {
+                    setBanner('Missing session token.');
+                    setInputEnabled(false);
+                    return;
+                }
+
+                try {
+                    const resp = await fetch(`{{ url_for('linkup_secure.api_chat_session', token='TOKEN') }}`.replace('TOKEN', encodeURIComponent(token)) + `?after_id=${lastMessageId}`);
+                    const data = await parseApiResponse(resp);
+                    if (!resp.ok && data.error === 'session_not_found') {
+                        renderState({ status: 'terminated', chat_name: 'Secure Chat', user_id: '', messages: [] });
+                        return;
+                    }
+                    if (resp.ok && data.status === 'terminated') {
+                        renderState(data);
+                        return;
+                    }
+                    if (!resp.ok) {
+                        setBanner(describeError(data.error, 'Could not refresh chat state.'));
+                        return;
+                    }
+                    renderState(data);
+                } catch (_error) {
+                    setBanner('Could not refresh chat state.');
+                }
+            }
+
+            async function postJson(url, payload = {}) {
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                return { resp, data: await parseApiResponse(resp) };
+            }
+
+            async function terminateSession() {
+                if (terminateInFlight) {
+                    return;
+                }
+                terminateInFlight = true;
+                terminateBtn.disabled = true;
+                setBanner('Terminating secure chat...');
+
+                if (pollHandle) {
+                    window.clearInterval(pollHandle);
+                    pollHandle = null;
+                }
+
+                try {
+                    await fetch(terminateUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: '{}',
+                        keepalive: true,
+                    });
+                } catch (_error) {
+                    // Navigate away even if the terminate request cannot complete.
+                }
+
+                window.location.href = backUrl;
+            }
+
+            function readFileAsAttachment(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const result = String(reader.result || '');
+                        const marker = 'base64,';
+                        const idx = result.indexOf(marker);
+                        if (idx === -1) {
+                            reject(new Error('invalid_file'));
+                            return;
+                        }
+                        resolve({
+                            name: file.name,
+                            mime: file.type || 'application/octet-stream',
+                            data: result.slice(idx + marker.length),
+                            size: file.size,
+                            kind: (file.type || '').startsWith('image/') ? 'image' : 'file',
+                        });
+                    };
+                    reader.onerror = () => reject(new Error('invalid_file'));
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            sendBtn.addEventListener('click', async () => {
+                const content = messageInput.value.trim();
+                if ((!content && !selectedAttachment) || !sessionState || sessionState.status !== 'connected') {
+                    return;
+                }
+
+                try {
+                    const { resp, data } = await postJson(`{{ url_for('linkup_secure.api_chat_message', token='TOKEN') }}`.replace('TOKEN', encodeURIComponent(token)), {
+                        content,
+                        attachment: selectedAttachment,
+                    });
+                    if (!resp.ok || !data.ok) {
+                        setBanner(describeError(data.error, 'Could not send message.'));
+                        return;
+                    }
+                    messageInput.value = '';
+                    autoSizeInput();
+                    setSelectedAttachment(null);
+                    await loadState();
+                } catch (_error) {
+                    setBanner('Could not send message.');
+                }
+            });
+
+            messageInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendBtn.click();
+                }
+            });
+
+            messageInput.addEventListener('input', () => {
+                autoSizeInput();
+                pingActivity();
+            });
+            messageInput.addEventListener('focus', () => {
+                pingActivity(true);
+            });
+
+            terminateBtn.addEventListener('click', async () => {
+                await terminateSession();
+            });
+
+            terminateBtn.addEventListener('pointerup', async (event) => {
+                if (event.pointerType === 'touch') {
+                    event.preventDefault();
+                    await terminateSession();
+                }
+            });
+
+            acceptBtn.addEventListener('click', async () => {
+                const { data } = await postJson(`{{ url_for('linkup_secure.api_chat_decision', token='TOKEN') }}`.replace('TOKEN', encodeURIComponent(token)), { decision: 'accept' });
+                if (data.ok) {
+                    requestPopup.hidden = true;
+                    await loadState();
+                }
+            });
+
+            rejectBtn.addEventListener('click', async () => {
+                const { data } = await postJson(`{{ url_for('linkup_secure.api_chat_decision', token='TOKEN') }}`.replace('TOKEN', encodeURIComponent(token)), { decision: 'reject' });
+                if (data.ok) {
+                    requestPopup.hidden = true;
+                    await loadState();
+                }
+            });
+
+            remainBtn.addEventListener('click', async () => {
+                try {
+                    const { resp, data } = await postJson(remainUrl);
+                    if (!resp.ok && data.status !== 'terminated') {
+                        setBanner(describeError(data.error, 'Could not keep the chat active.'));
+                        return;
+                    }
+                    await loadState();
+                } catch (_error) {
+                    setBanner('Could not keep the chat active.');
+                }
+            });
+
+            fileBtn.addEventListener('click', () => {
+                if (!fileBtn.disabled) {
+                    pingActivity(true);
+                    fileInput.click();
+                }
+            });
+
+            fileInput.addEventListener('change', async () => {
+                const [file] = Array.from(fileInput.files || []);
+                if (!file) {
+                    setSelectedAttachment(null);
+                    return;
+                }
+                if (file.size > (2 * 1024 * 1024)) {
+                    setBanner('Attachment must be 2 MB or smaller.');
+                    setSelectedAttachment(null);
+                    return;
+                }
+                try {
+                    const attachment = await readFileAsAttachment(file);
+                    setSelectedAttachment(attachment);
+                    pingActivity(true);
+                } catch (_error) {
+                    setBanner('Could not read attachment.');
+                    setSelectedAttachment(null);
+                }
+            });
+
+            fileRemove.addEventListener('click', () => {
+                setSelectedAttachment(null);
+                pingActivity(true);
+            });
+
+            shell.addEventListener('pointerdown', () => {
+                pingActivity();
+            });
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    pingActivity(true);
+                }
+            });
+
+            loadState();
+            autoSizeInput();
+            pollHandle = window.setInterval(loadState, 1600);
+        })();
+    </script>
+</body>
+</html>

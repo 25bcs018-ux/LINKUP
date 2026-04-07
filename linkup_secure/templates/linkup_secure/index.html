@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>LinkUp Secure</title>
+    <meta name="csrf-token" content="{{ csrf_token }}" />
+    <meta name="description" content="LinkUp Secure is the privacy-focused workspace for protected communication and controlled access." />
+    <meta name="theme-color" content="#06131a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LinkUp Secure" />
+    <link rel="manifest" href="{{ url_for('linkup_secure.secure_manifest') }}" />
+    <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+    <link rel="stylesheet" href="{{ url_for('linkup_secure.static', filename='secure.css') }}" />
+</head>
+<body>
+    <div class="page-shell">
+        <header class="topbar">
+            <a class="brand" href="{{ url_for('front') }}" aria-label="Return to LinkUp home">
+                <span class="brand-mark" aria-hidden="true"></span>
+                <span>LinkUp Secure</span>
+            </a>
+            <nav class="top-actions" aria-label="LinkUp Secure navigation">
+                <a class="ghost-link" href="{{ url_for('front') }}">Main LinkUp Site</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="hero-layout" aria-label="LinkUp Secure introduction">
+                <section class="hero-copy">
+                    <div class="badge">
+                        <span class="status-dot" aria-hidden="true"></span>
+                        <span>Secure communications portal</span>
+                    </div>
+                    <div class="heading-row">
+                        <h1>Enter a dedicated space for protected communication.</h1>
+                        <a class="heading-symbol" href="{{ url_for('linkup_secure.link') }}" aria-label="Open Link page">
+                            <span class="brand-mark heading-mark" aria-hidden="true"></span>
+                            <span class="symbol-link">Link</span>
+                        </a>
+                    </div>
+                    <p class="lead">
+                        LinkUp Secure provides a separate front door for conversations that demand a clearer sense of control,
+                        privacy, and professionalism. Sign in, continue with verified access, and manage communication from a
+                        dedicated environment designed to stand apart from the public-facing LinkUp experience.
+                    </p>
+
+                    <div class="mini-features" aria-label="LinkUp Secure highlights">
+                        <span class="chip">Separate entry</span>
+                        <span class="chip">Formal experience</span>
+                        <span class="chip">Ready to expand</span>
+                    </div>
+                    <aside class="status-panel" aria-label="LinkUp Secure preview">
+                        <div class="status-card">
+                            <div class="mock-top">
+                                <div class="mock-title">
+                                    <span>LinkUp Secure</span>
+                                </div>
+                                <div class="status-label">
+                                    <span class="status-dot" aria-hidden="true"></span>
+                                    <span>Protected</span>
+                                </div>
+                            </div>
+                            <div class="info-panel primary">
+                                <strong>Separate secure landing experience</strong>
+                                <p>Users arrive here before entering the wider LinkUp platform.</p>
+                            </div>
+                            <div class="info-panel">
+                                <strong>Privacy-conscious access</strong>
+                                <p>Guide sign-in through a more focused and deliberate first step.</p>
+                            </div>
+                            <div class="info-panel muted">
+                                <strong>Next step</strong>
+                                <p>Authenticate to continue securely.</p>
+                            </div>
+                        </div>
+                    </aside>
+                </section>
+            </section>
+        </main>
+    </div>
+    <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+    <script>
+        (() => {
+            const trigger = document.querySelector('.heading-symbol');
+            if (!trigger) {
+                return;
+            }
+
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            let isAnimating = false;
+
+            trigger.addEventListener('click', (event) => {
+                if (isAnimating || prefersReducedMotion) {
+                    return;
+                }
+
+                event.preventDefault();
+                isAnimating = true;
+
+                const destination = trigger.href;
+                const rect = trigger.getBoundingClientRect();
+                const overlay = document.createElement('div');
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                const centerX = rect.left + (rect.width / 2);
+                const centerY = rect.top + (rect.height / 2);
+                const deltaX = (viewportWidth / 2) - centerX;
+                const deltaY = (viewportHeight / 2) - centerY;
+                const scale = Math.max(
+                    Math.hypot(viewportWidth, viewportHeight) / Math.max(rect.width, rect.height),
+                    12,
+                );
+
+                overlay.className = 'heading-symbol page-transition';
+                overlay.setAttribute('aria-hidden', 'true');
+                overlay.innerHTML = trigger.innerHTML;
+                overlay.style.left = `${rect.left}px`;
+                overlay.style.top = `${rect.top}px`;
+                overlay.style.width = `${rect.width}px`;
+                overlay.style.height = `${rect.height}px`;
+                overlay.style.transform = 'translate3d(0, 0, 0) scale(1)';
+                overlay.style.setProperty(
+                    '--target-transform',
+                    `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scale})`,
+                );
+
+                document.body.classList.add('page-is-transitioning');
+                document.body.appendChild(overlay);
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        overlay.classList.add('is-active');
+                    });
+                });
+
+                window.setTimeout(() => {
+                    window.location.href = destination;
+                }, 680);
+            });
+        })();
+    </script>
+</body>
+</html>
