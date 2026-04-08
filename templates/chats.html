@@ -129,6 +129,8 @@
             {% endfor %}
           {% endif %}
         </div>
+
+        <div class="sidebar-nova" id="sidebarNovaSlot" aria-label="NOVA quick chat"></div>
       </aside>
 
       <main class="main" aria-label="Conversation">
@@ -140,7 +142,7 @@
               <strong id="peerName">
                 {% if is_group_chat and active_group %}{{ active_group.name }}{% elif is_self_chat %}Saved Messages{% elif active_user %}{{ active_user.username }}{% else %}No chat selected{% endif %}
               </strong>
-              <span>
+              <span id="peerStatus">
                 {% if is_group_chat and active_group %}
                   Group chat
                 {% elif is_self_chat %}
@@ -148,7 +150,7 @@
                 {% elif active_user and active_user.username|lower == 'nova' %}
                   AI assistant
                 {% elif active_user %}
-                  Online
+                  Checking status...
                 {% else %}
                   Select a user from the left
                 {% endif %}
@@ -276,11 +278,13 @@
 
   <!-- NOVA floating chat widget (preserves state when closed) -->
   <button class="nova-fab" id="novaFab" type="button" aria-label="Chat with NOVA">
+    <span class="nova-label" aria-hidden="true">NOVA</span>
     <span class="nova-logo" aria-hidden="true">
       <span class="nova-ai" aria-hidden="true"></span>
     </span>
     <span class="nova-tip" aria-hidden="true">Chat with NOVA</span>
   </button>
+  <span class="nova-fab-home" id="novaFabHome" aria-hidden="true"></span>
 
   <section class="nova-panel" id="novaPanel" aria-label="NOVA chat" aria-hidden="true">
     <header class="nova-hd">
@@ -379,6 +383,7 @@
     const meAboutEl = document.getElementById('meAbout');
     const meAvatarEl = document.getElementById('meAvatar');
     const peerAvatarEl = document.getElementById('peerAvatar');
+    const peerStatusEl = document.getElementById('peerStatus');
     const chatKebab = document.getElementById('chatKebab');
     const sidebar = document.querySelector('.sidebar');
     const openSidebarBtn = document.getElementById('openSidebarBtn');
@@ -449,6 +454,8 @@
     // ------------------ NOVA Floating Widget ------------------
     const novaFab = document.getElementById('novaFab');
     const novaPanel = document.getElementById('novaPanel');
+    const sidebarNovaSlot = document.getElementById('sidebarNovaSlot');
+    const novaFabHome = document.getElementById('novaFabHome');
     const novaClose = document.getElementById('novaClose');
     const novaMessages = document.getElementById('novaMessages');
     const novaHero = document.getElementById('novaHero');
@@ -882,6 +889,10 @@
       sidebarScrim?.setAttribute('aria-hidden', 'false');
       if (isMobile()) {
         document.body.classList.add('sidebar-open');
+        if (sidebarNovaSlot && novaFab) {
+          sidebarNovaSlot.appendChild(novaFab);
+          novaFab.classList.add('in-sidebar');
+        }
       }
     }
 
@@ -891,6 +902,10 @@
       sidebarScrim?.classList.remove('show');
       sidebarScrim?.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('sidebar-open');
+      if (novaFab && novaFabHome) {
+        novaFabHome.before(novaFab);
+        novaFab.classList.remove('in-sidebar');
+      }
     }
 
     openSidebarBtn?.addEventListener('click', openSidebar);
@@ -1099,6 +1114,80 @@
       }
     }
 
+    function setAvatarPresence(avatarEl, isOnline) {
+      if (!avatarEl) return;
+      avatarEl.classList.toggle('presence-online', !!isOnline);
+    }
+
+    function formatLastSeenRelative(iso) {
+      if (!iso) return 'Offline';
+      const dt = new Date(iso);
+      if (!Number.isFinite(dt.getTime())) return 'Offline';
+      const now = Date.now();
+      const diffMs = Math.max(0, now - dt.getTime());
+      const sec = Math.floor(diffMs / 1000);
+      if (sec < 60) return 'Last seen just now';
+      const min = Math.floor(sec / 60);
+      if (min < 60) return `Last seen ${min}m ago`;
+      const hrs = Math.floor(min / 60);
+      if (hrs < 24) return `Last seen ${hrs}h ago`;
+      const days = Math.floor(hrs / 24);
+      if (days < 7) return `Last seen ${days}d ago`;
+      const stamp = dt.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return `Last seen ${stamp}`;
+    }
+
+    function presenceText(info) {
+      if (info && info.is_online) return 'Online';
+      if (info && info.last_seen_at) return formatLastSeenRelative(info.last_seen_at);
+      return 'Offline';
+    }
+
+    function updateActivePeerStatus(presenceMap) {
+      if (!peerStatusEl) return;
+      if (activeKind !== 'user' || !activeUsername) return;
+      const activeLower = String(activeUsername || '').toLowerCase();
+      if (!activeLower || activeLower === String(meUsername || '').toLowerCase()) return;
+      if (activeLower === 'nova') return;
+      const info = presenceMap?.get?.(activeLower) || null;
+      if (!info) {
+        peerStatusEl.textContent = 'Offline';
+        setAvatarPresence(peerAvatarEl, false);
+        return;
+      }
+      peerStatusEl.textContent = presenceText(info);
+      setAvatarPresence(peerAvatarEl, !!info.is_online);
+    }
+
+    function applyPresenceFromSidebar(directItems) {
+      const map = new Map();
+      for (const item of (Array.isArray(directItems) ? directItems : [])) {
+        const uname = String(item?.username || '').trim().toLowerCase();
+        if (!uname) continue;
+        map.set(uname, {
+          is_online: !!item?.is_online,
+          last_seen_at: String(item?.last_seen_at || '').trim()
+        });
+      }
+      window.__presenceMap = map;
+
+      chatList?.querySelectorAll?.('.chat[data-username]')?.forEach?.((el) => {
+        const uname = String(el.getAttribute('data-username') || '').trim();
+        if (!uname) return;
+        const key = uname.toLowerCase();
+        if (key === String(meUsername || '').toLowerCase()) return;
+        if (key === 'nova') return;
+        const info = map.get(key);
+        if (!info) return;
+        const avatar = el.querySelector('.avatar');
+        setAvatarPresence(avatar, !!info.is_online);
+        const metaP = el.querySelector('.meta p');
+        if (metaP) metaP.textContent = presenceText(info);
+      });
+
+      updateActivePeerStatus(map);
+    }
+
     async function refreshDirectUnreadBadges() {
       try {
         const res = await fetch('/api/chats/sidebar');
@@ -1107,6 +1196,7 @@
         const direct = data?.direct || [];
         applyDirectUnreadBadges(direct);
         reorderDirectChatsByUnread(direct);
+        applyPresenceFromSidebar(direct);
       } catch {
         // ignore badge refresh failures
       }
@@ -1822,6 +1912,7 @@
       const wasNearBottom = prevBottomGap <= nearBottomThreshold;
 
       messagesEl.innerHTML = '';
+      const fragment = document.createDocumentFragment();
       if (activeKind === 'group') {
         if (!activeGroupId) return;
       } else {
@@ -1839,7 +1930,8 @@
         const hint = document.createElement('div');
         hint.className = 'hint';
         hint.textContent = 'No messages yet. Say hi 👋';
-        messagesEl.appendChild(hint);
+        fragment.appendChild(hint);
+        messagesEl.appendChild(fragment);
         return;
       }
 
@@ -1855,7 +1947,7 @@
           const sep = document.createElement('div');
           sep.className = 'daysep';
           sep.textContent = day;
-          messagesEl.appendChild(sep);
+          fragment.appendChild(sep);
           lastSender = '';
         }
 
@@ -1973,8 +2065,10 @@
         t.textContent = marks.length ? `${baseTime} • ${marks.join(' ')}` : baseTime;
         div.appendChild(t);
 
-        messagesEl.appendChild(div);
+        fragment.appendChild(div);
       }
+
+      messagesEl.appendChild(fragment);
 
       const forceScroll = !!options.forceScroll;
       if (forceScroll || wasNearBottom) {
@@ -1983,6 +2077,31 @@
         const keepTop = Math.max(0, messagesEl.scrollHeight - prevClientHeight - prevBottomGap);
         messagesEl.scrollTop = keepTop;
       }
+    }
+
+    function appendPendingMessage(content) {
+      if (!messagesEl) return null;
+      const div = document.createElement('div');
+      div.className = 'bubble out pending';
+      div.dataset.mid = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+      const body = document.createElement('div');
+      body.className = 'body';
+
+      const text = document.createElement('div');
+      text.className = 'text';
+      text.textContent = content;
+      body.appendChild(text);
+      div.appendChild(body);
+
+      const t = document.createElement('span');
+      t.className = 'time pending';
+      t.textContent = 'Sending…';
+      div.appendChild(t);
+
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return div;
     }
 
     function flashAndScrollTo(mid) {
@@ -2288,19 +2407,32 @@
 
     let lastHash = '';
     let firstLoad = true;
-    async function refreshMessages() {
+    function getLastMessageId() {
+      const list = Array.isArray(window.__lastMsgs) ? window.__lastMsgs : [];
+      if (!list.length) return 0;
+      const last = list[list.length - 1];
+      const lastId = Number(last?.id || 0);
+      return Number.isFinite(lastId) ? lastId : 0;
+    }
+
+    async function refreshMessages(options = {}) {
       if (activeKind === 'group') {
         if (!activeGroupId) return;
       } else {
         if (!activeUsername) return;
       }
+      const incremental = !!options.incremental;
+      const lastId = incremental ? getLastMessageId() : 0;
       if (firstLoad) {
         firstLoad = false;
         messagesEl.innerHTML = '<div class="hint">Loading messages…</div>';
       }
-      const url = (activeKind === 'group')
+      const baseUrl = (activeKind === 'group')
         ? `/api/groups/${encodeURIComponent(String(activeGroupId))}/messages`
         : `/api/messages/${encodeURIComponent(activeUsername)}`;
+      const url = (incremental && lastId)
+        ? `${baseUrl}?since_id=${encodeURIComponent(String(lastId))}`
+        : baseUrl;
 
       const res = await fetch(url);
       if (!res.ok) {
@@ -2314,12 +2446,23 @@
         return;
       }
       const data = normalizeTransportMessages(await res.json());
-      window.__lastMsgs = Array.isArray(data) ? data : [];
-      const h = JSON.stringify(data);
-      if (h !== lastHash) {
-        const isInitialRender = !lastHash;
-        lastHash = h;
-        renderMessages(data, { forceScroll: isInitialRender });
+      if (incremental && lastId) {
+        const existing = Array.isArray(window.__lastMsgs) ? window.__lastMsgs : [];
+        const additions = Array.isArray(data) ? data.filter((m) => Number(m?.id || 0) > lastId) : [];
+        if (additions.length) {
+          const combined = existing.concat(additions);
+          window.__lastMsgs = combined;
+          lastHash = JSON.stringify(combined);
+          renderMessages(combined, { forceScroll: false });
+        }
+      } else {
+        window.__lastMsgs = Array.isArray(data) ? data : [];
+        const h = JSON.stringify(data);
+        if (h !== lastHash) {
+          const isInitialRender = !lastHash;
+          lastHash = h;
+          renderMessages(data, { forceScroll: isInitialRender });
+        }
       }
       refreshDirectUnreadBadges();
     }
@@ -4101,14 +4244,24 @@
 
     renderEmojiPanel([]);
 
+    function deferWork(fn) {
+      if (window.requestIdleCallback) {
+        window.requestIdleCallback(fn, { timeout: 1200 });
+      } else {
+        setTimeout(fn, 600);
+      }
+    }
+
     if (emojiPanel) {
-      fetch('/api/emojis/library')
-        .then((res) => res.ok ? res.json() : null)
-        .then((data) => {
-          const lib = data && Array.isArray(data.items) ? data.items : [];
-          renderEmojiPanel(lib);
-        })
-        .catch(() => {});
+      deferWork(() => {
+        fetch('/api/emojis/library')
+          .then((res) => res.ok ? res.json() : null)
+          .then((data) => {
+            const lib = data && Array.isArray(data.items) ? data.items : [];
+            renderEmojiPanel(lib);
+          })
+          .catch(() => {});
+      });
     }
 
     emojiBtn?.addEventListener('click', () => {
@@ -4137,6 +4290,11 @@
       const content = (messageInput.value || '').trim();
       if (!content && !selectedFile) return;
 
+      const originalContent = content;
+      const pendingBubble = (!selectedFile && originalContent)
+        ? appendPendingMessage(originalContent)
+        : null;
+
       const btn = composer.querySelector('button.send');
       if (btn) {
         btn.disabled = true;
@@ -4146,17 +4304,19 @@
 
       try {
         if (selectedFile) {
-          await sendAttachment(selectedFile, content);
+          await sendAttachment(selectedFile, originalContent);
           setSelectedFile(null);
           messageInput.value = '';
           setReplyTo(null);
         } else {
           messageInput.value = '';
-          await sendMessage(content);
+          await sendMessage(originalContent);
           setReplyTo(null);
         }
-        await refreshMessages();
+        refreshMessages();
       } catch (err) {
+        if (pendingBubble) pendingBubble.remove();
+        if (!selectedFile && originalContent) messageInput.value = originalContent;
         toast('Send failed', err.message || 'Try again');
       } finally {
         if (btn) {
@@ -4737,6 +4897,39 @@
       const data = await res.json().catch(() => ({}));
       const msg = data.error || 'Withdraw failed';
       throw new Error(msg);
+    }
+
+    let presenceTimer = null;
+    let lastPresencePing = 0;
+
+    function getPresencePingInterval() {
+      if (document.visibilityState === 'hidden') return 45000;
+      return 25000;
+    }
+
+    async function pingPresence() {
+      if (document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if ((now - lastPresencePing) < 8000) return;
+      lastPresencePing = now;
+      try {
+        await fetch('/api/presence/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    function schedulePresencePing(immediate = false) {
+      if (presenceTimer) clearTimeout(presenceTimer);
+      const delay = immediate ? 0 : getPresencePingInterval();
+      presenceTimer = setTimeout(async () => {
+        await pingPresence();
+        schedulePresencePing(false);
+      }, delay);
     }
 
     function launchRequestPlane(anchor) {
@@ -5667,32 +5860,83 @@
       });
     }
 
-    // Initial load + poll
+    // Initial load + adaptive poll
     applyWallpaperForActiveChat();
     refreshMessages();
-    setInterval(refreshMessages, 1200);
     loadInboxCount();
     refreshDirectUnreadBadges();
-    setInterval(() => {
-      loadInboxCount();
-      refreshDirectUnreadBadges();
-    }, 1800);
+    schedulePresencePing(true);
+
+    let lastUserActivity = Date.now();
+    const ACTIVE_WINDOW_MS = 5000;
+    let messagesPollTimer = null;
+    let inboxPollTimer = null;
+
+    function noteUserActivity() {
+      lastUserActivity = Date.now();
+    }
+
+    function getMessagesPollInterval() {
+      if (document.visibilityState === 'hidden') return 8000;
+      if ((Date.now() - lastUserActivity) < ACTIVE_WINDOW_MS) return 1500;
+      return 3000;
+    }
+
+    function getInboxPollInterval() {
+      if (document.visibilityState === 'hidden') return 12000;
+      if ((Date.now() - lastUserActivity) < ACTIVE_WINDOW_MS) return 3000;
+      return 4500;
+    }
+
+    function scheduleMessagesPoll(immediate = false) {
+      if (messagesPollTimer) clearTimeout(messagesPollTimer);
+      const delay = immediate ? 0 : getMessagesPollInterval();
+      messagesPollTimer = setTimeout(async () => {
+        await refreshMessages({ incremental: true });
+        scheduleMessagesPoll(false);
+      }, delay);
+    }
+
+    function scheduleInboxPoll(immediate = false) {
+      if (inboxPollTimer) clearTimeout(inboxPollTimer);
+      const delay = immediate ? 0 : getInboxPollInterval();
+      inboxPollTimer = setTimeout(async () => {
+        await loadInboxCount();
+        await refreshDirectUnreadBadges();
+        scheduleInboxPoll(false);
+      }, delay);
+    }
+
+    scheduleMessagesPoll(true);
+    scheduleInboxPoll(true);
+
+    window.addEventListener('pointerdown', noteUserActivity, { passive: true });
+    window.addEventListener('keydown', noteUserActivity, { passive: true });
+    window.addEventListener('touchstart', noteUserActivity, { passive: true });
+    messageInput?.addEventListener('input', noteUserActivity, { passive: true });
 
     function refreshLiveState() {
       refreshMessages();
       loadInboxCount();
       refreshDirectUnreadBadges();
+      pingPresence();
       if (novaOpen) refreshNovaMessages();
     }
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         refreshLiveState();
+        scheduleMessagesPoll(true);
+        scheduleInboxPoll(true);
+        schedulePresencePing(true);
       }
     });
 
     window.addEventListener('focus', () => {
       refreshLiveState();
+      scheduleMessagesPoll(true);
+      scheduleInboxPoll(true);
+      schedulePresencePing(true);
     });
 
     // On mobile, open sidebar by default if no chat is active
