@@ -13,9 +13,31 @@
     <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
 </head>
-<body class="bg-animated">
+<body class="bg-animated{% if error %} auth-error{% endif %}">
     <div class="auth-page">
         <div class="auth-shell">
+            {% if error %}
+            <div class="auth-error-splash" id="authErrorSplash" data-error="{{ error|e }}">
+                <div class="error-logo-wrap" aria-hidden="true">
+                    <span class="logo error-logo"></span>
+                    <span class="error-ring ring-left"></span>
+                    <span class="error-ring ring-right"></span>
+                    <span class="error-lock"></span>
+                    <span class="error-nova" aria-hidden="true"></span>
+                </div>
+                <div class="error-mascot">
+                    <div class="error-mascot-img" aria-hidden="true"></div>
+                    <div class="error-mascot-text">
+                        <strong>Sign-in issue</strong>
+                        <span>{{ error }}</span>
+                        <em class="error-slang">Try again, legend.</em>
+                    </div>
+                </div>
+                <div class="error-cta">
+                    <button class="btn primary" id="tryAgainBtn" type="button">Try again</button>
+                </div>
+            </div>
+            {% endif %}
             <section class="auth-hero" aria-label="Welcome">
                 <a class="brand" href="{{ url_for('front') }}" aria-label="LinkUp home">
                     <span class="logo" aria-hidden="true"></span>
@@ -69,6 +91,19 @@
         </div>
     </div>
 
-    <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+        <script>
+            const tryAgainBtn = document.getElementById('tryAgainBtn');
+            tryAgainBtn?.addEventListener('click', () => {
+                document.body.classList.remove('auth-error');
+                document.body.classList.add('auth-error-dismissed');
+                const splash = document.getElementById('authErrorSplash');
+                if (splash) splash.setAttribute('aria-hidden', 'true');
+                const notice = document.querySelector('.notice.error');
+                if (notice) notice.remove();
+                const userInput = document.getElementById('username');
+                if (userInput) userInput.focus();
+            });
+        </script>
+        <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
 </body>
 </html>
