@@ -96,6 +96,13 @@ def _utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def _presence_window_seconds() -> int:
+    try:
+        return max(20, int(os.environ.get("LINKUP_PRESENCE_WINDOW_SECONDS") or "70"))
+    except Exception:
+        return 70
+
+
 def _is_api_request() -> bool:
     try:
         path = request.path or ''
@@ -195,7 +202,11 @@ def _add_security_headers(response):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    if request.path in ('/chats', '/service-worker.js'):
+    path = request.path or ''
+    if path.startswith('/static/'):
+        if PRODUCTION:
+            response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+    if path in ('/chats', '/service-worker.js'):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -247,6 +258,7 @@ class User(db.Model):
     about = db.Column(db.String(140), nullable=True)
     avatar_color = db.Column(db.String(16), nullable=True)
     avatar_filename = db.Column(db.String(120), nullable=True)
+    last_seen_at = db.Column(db.DateTime, nullable=True)
 
     def __repr__(self):
         return f"<User {self.username}>"
@@ -513,6 +525,51 @@ def _get_me():
     if not user_id:
         return None
     return _db_get(User, user_id)
+
+
+def _is_user_online(user: User | None, now: datetime | None = None) -> bool:
+    if not user:
+        return False
+    last_seen = getattr(user, 'last_seen_at', None)
+    if not last_seen:
+        return False
+    if not now:
+        now = _utcnow()
+    try:
+        return (now - last_seen).total_seconds() <= _presence_window_seconds()
+    except Exception:
+        return False
+
+
+def _presence_payload_for(user: User | None) -> dict:
+    if not user:
+        return {'is_online': False, 'last_seen_at': ''}
+    now = _utcnow()
+    last_seen = getattr(user, 'last_seen_at', None)
+    return {
+        'is_online': _is_user_online(user, now=now),
+        'last_seen_at': (last_seen.isoformat() + 'Z') if last_seen else '',
+    }
+
+
+def _touch_last_seen(user: User | None, now: datetime | None = None) -> bool:
+    if not user:
+        return False
+    if not now:
+        now = _utcnow()
+    last_seen = getattr(user, 'last_seen_at', None)
+    try:
+        if last_seen and (now - last_seen).total_seconds() < 15:
+            return False
+    except Exception:
+        pass
+    user.last_seen_at = now
+    try:
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        return False
 
 
 def _get_csrf_token() -> str:
@@ -910,6 +967,18 @@ def _ensure_user_onboarding_seen_column() -> None:
         return
 
 
+def _ensure_user_presence_column() -> None:
+    try:
+        with app.app_context():
+            cols = {r[1] for r in db.session.execute(text('PRAGMA table_info(user)')).fetchall()}
+            if 'last_seen_at' in cols:
+                return
+            db.session.execute(text('ALTER TABLE user ADD COLUMN last_seen_at DATETIME'))
+            db.session.commit()
+    except Exception:
+        return
+
+
 # Best-effort: add new columns for existing SQLite DBs.
 _ensure_user_profile_columns()
 _ensure_group_image_columns()
@@ -917,6 +986,7 @@ _ensure_message_attachment_columns()
 _ensure_message_action_columns()
 _ensure_user_email_verified_column()
 _ensure_user_onboarding_seen_column()
+_ensure_user_presence_column()
 
 
 def _is_nova_username(username: str) -> bool:
@@ -2719,6 +2789,20 @@ def api_me_onboarding_seen():
         return jsonify({'ok': False}), 500
 
 
+@app.route('/api/presence/ping', methods=['POST'])
+def api_presence_ping():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+    updated = _touch_last_seen(me)
+    return jsonify({
+        'ok': True,
+        'updated': bool(updated),
+        'server_time': _utcnow().isoformat() + 'Z',
+        'online_window_seconds': _presence_window_seconds(),
+    })
+
+
 @app.route('/api/groups/<int:group_id>/messages', methods=['GET'])
 def api_group_messages_get(group_id: int):
     me = _get_me()
@@ -2731,9 +2815,17 @@ def api_group_messages_get(group_id: int):
     if not g:
         return jsonify({'error': 'group_not_found'}), 404
 
+    since_id_raw = (request.args.get('since_id') or '').strip()
+    since_id = None
+    if since_id_raw.isdigit():
+        since_id = int(since_id_raw)
+
+    msg_query = GroupMessage.query.filter(GroupMessage.group_id == int(group_id))
+    if since_id:
+        msg_query = msg_query.filter(GroupMessage.id > since_id)
+
     msgs = (
-        GroupMessage.query
-        .filter(GroupMessage.group_id == int(group_id))
+        msg_query
         .order_by(GroupMessage.created_at.asc(), GroupMessage.id.asc())
         .limit(300)
         .all()
@@ -3334,11 +3426,14 @@ def api_user_public(username: str):
     if other.id != me.id and not _is_accepted_contact(me.id, other.id):
         return jsonify({'error': 'not_a_contact'}), 403
 
+    presence = _presence_payload_for(other)
     return jsonify({
         'username': other.username,
         'display_name': other.display_name or '',
         'about': other.about or '',
         'avatar_url': _avatar_url(other),
+        'is_online': presence.get('is_online', False),
+        'last_seen_at': presence.get('last_seen_at', ''),
     })
 
 
@@ -4267,30 +4362,32 @@ def api_get_messages(other_username: str):
 
     is_self = other.id == me.id
 
+    since_id_raw = (request.args.get('since_id') or '').strip()
+    since_id = None
+    if since_id_raw.isdigit():
+        since_id = int(since_id_raw)
+
     if is_self:
-        msgs = (
-            Message.query
-            .filter(Message.sender_id == me.id, Message.recipient_id == me.id)
-            .order_by(Message.created_at.asc(), Message.id.asc())
-            .limit(300)
-            .all()
-        )
+        msg_query = Message.query.filter(Message.sender_id == me.id, Message.recipient_id == me.id)
     else:
         if not _is_nova_username(other.username) and not _is_accepted_contact(me.id, other.id):
             return jsonify({'error': 'not_a_contact'}), 403
-
-        msgs = (
-            Message.query
-            .filter(
-                db.or_(
-                    db.and_(Message.sender_id == me.id, Message.recipient_id == other.id),
-                    db.and_(Message.sender_id == other.id, Message.recipient_id == me.id),
-                )
+        msg_query = Message.query.filter(
+            db.or_(
+                db.and_(Message.sender_id == me.id, Message.recipient_id == other.id),
+                db.and_(Message.sender_id == other.id, Message.recipient_id == me.id),
             )
-            .order_by(Message.created_at.asc(), Message.id.asc())
-            .limit(300)
-            .all()
         )
+
+    if since_id:
+        msg_query = msg_query.filter(Message.id > since_id)
+
+    msgs = (
+        msg_query
+        .order_by(Message.created_at.asc(), Message.id.asc())
+        .limit(300)
+        .all()
+    )
 
     if msgs:
         ids = [m.id for m in msgs]
@@ -4452,6 +4549,7 @@ def api_chats_sidebar():
             last_sender = _db_get(User, int(last_msg.sender_id)) if getattr(last_msg, 'sender_id', None) else None
             last_sender_username = str(getattr(last_sender, 'username', '') or '')
 
+        presence = _presence_payload_for(other)
         direct_items.append({
             'kind': 'user',
             'username': other.username,
@@ -4461,6 +4559,8 @@ def api_chats_sidebar():
             'last_message_at': created_at,
             'last_sender_username': last_sender_username,
             'preview': preview,
+            'is_online': presence.get('is_online', False),
+            'last_seen_at': presence.get('last_seen_at', ''),
         })
 
     direct_items.sort(key=lambda item: (0 if int(item['unread_count']) > 0 else 1, -(int(item['last_message_id']) or 0), str(item['username']).lower()))
