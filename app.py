@@ -5,11 +5,15 @@ import logging
 import os
 import random
 import re
+import shutil
 from pathlib import Path
 import smtplib
 from email.message import EmailMessage
 import secrets
 from typing import Optional
+from urllib.parse import urlparse
+
+from PIL import Image, ImageDraw, ImageFont
 
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
@@ -263,6 +267,23 @@ class Message(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
 
+class UserMedia(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    kind = db.Column(db.String(16), nullable=False)  # gif|sticker
+    title = db.Column(db.String(80), nullable=True)
+    filename = db.Column(db.String(140), nullable=False)
+    mime = db.Column(db.String(60), nullable=False)
+    size = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+
+class GlobalEmoji(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    emoji = db.Column(db.String(16), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+
 class GroupMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=False)
@@ -463,6 +484,28 @@ def _ensure_chat_state_tables() -> None:
 
 
 _ensure_chat_state_tables()
+
+
+def _ensure_user_media_table() -> None:
+    try:
+        with app.app_context():
+            UserMedia.__table__.create(bind=db.engine, checkfirst=True)
+    except Exception:
+        return
+
+
+_ensure_user_media_table()
+
+
+def _ensure_global_emoji_table() -> None:
+    try:
+        with app.app_context():
+            GlobalEmoji.__table__.create(bind=db.engine, checkfirst=True)
+    except Exception:
+        return
+
+
+_ensure_global_emoji_table()
 
 
 def _get_me():
@@ -1285,6 +1328,10 @@ def _uploads_dir() -> Path:
     return Path(app.instance_path) / 'uploads'
 
 
+def _media_dir() -> Path:
+    return _uploads_dir() / 'media'
+
+
 def _avatar_url(user: User | None) -> str:
     if not user or not getattr(user, 'avatar_filename', None):
         return ''
@@ -1346,16 +1393,45 @@ def download_upload(filename: str):
     if me.id not in (msg.sender_id, msg.recipient_id):
         return jsonify({'error': 'forbidden'}), 403
 
-    path = _uploads_dir() / filename
+    base_dir = _uploads_dir()
+    path = base_dir / filename
+    if not path.exists() and _is_media_file(filename):
+        base_dir = _media_dir()
+        path = base_dir / filename
     if not path.exists():
         return jsonify({'error': 'not_found'}), 404
 
     # Let images/PDF render in-browser; user can still save from UI.
     return send_from_directory(
-        str(_uploads_dir()),
+        str(base_dir),
         filename,
         as_attachment=False,
         download_name=(msg.attachment_original or filename),
+    )
+
+
+@app.route('/api/media/<int:media_id>/file')
+def download_media(media_id: int):
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    media = _db_get(UserMedia, media_id)
+    if not media:
+        return jsonify({'error': 'not_found'}), 404
+    if int(media.user_id) != int(me.id):
+        return jsonify({'error': 'forbidden'}), 403
+
+    path = _media_dir() / media.filename
+    if not path.exists():
+        return jsonify({'error': 'not_found'}), 404
+
+    return send_from_directory(
+        str(_media_dir()),
+        media.filename,
+        as_attachment=False,
+        download_name=(media.title or media.filename),
+        mimetype=(media.mime or None),
     )
 
 
@@ -1365,6 +1441,316 @@ def _allowed_attachment_ext(filename: str) -> str | None:
         if name.endswith(ext):
             return ext
     return None
+
+
+def _allowed_media_kind(mime: str, filename: str) -> str | None:
+    m = (mime or '').lower()
+    name = (filename or '').lower()
+    if m == 'image/gif' or name.endswith('.gif'):
+        return 'gif'
+    if any(name.endswith(ext) for ext in ('.png', '.webp', '.jpg', '.jpeg')):
+        return 'sticker'
+    if m.startswith('image/'):
+        return 'sticker'
+    return None
+
+
+def _attachment_media_kind(mime: str, filename: str) -> str | None:
+    m = (mime or '').lower()
+    name = (filename or '').lower()
+    if m == 'image/gif' or name.endswith('.gif'):
+        return 'gif'
+    if m in ('image/webp', 'image/png') or name.endswith('.webp') or name.endswith('.png'):
+        return 'sticker'
+    return None
+
+
+def _save_user_media(me: User, kind: str, title: str, filename: str, mime: str, size: int) -> UserMedia:
+    media = UserMedia(
+        user_id=int(me.id),
+        kind=(kind or 'sticker')[:16],
+        title=(title or '')[:80],
+        filename=filename,
+        mime=(mime or '')[:60],
+        size=int(size or 0),
+    )
+    db.session.add(media)
+    db.session.commit()
+    return media
+
+
+def _media_response_payload(media: UserMedia) -> dict:
+    return {
+        'id': int(media.id),
+        'kind': media.kind,
+        'title': media.title or '',
+        'url': url_for('download_media', media_id=int(media.id)),
+        'mime': media.mime,
+        'size': int(media.size or 0),
+        'created_at': media.created_at.isoformat() if media.created_at else '',
+    }
+
+
+def _ensure_media_dir() -> None:
+    try:
+        _media_dir().mkdir(parents=True, exist_ok=True)
+    except Exception:
+        return
+
+
+def _center_crop_square(img: Image.Image) -> Image.Image:
+    w, h = img.size
+    side = min(w, h)
+    left = max(0, (w - side) // 2)
+    top = max(0, (h - side) // 2)
+    return img.crop((left, top, left + side, top + side))
+
+
+def _draw_caption(img: Image.Image, caption: str) -> None:
+    if not caption:
+        return
+    text = caption.strip()
+    if not text:
+        return
+    text = text[:60]
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+    pad = 6
+    if hasattr(draw, 'textbbox'):
+        bbox = draw.textbbox((0, 0), text, font=font)
+        tw = (bbox[2] - bbox[0]) if bbox else 0
+        th = (bbox[3] - bbox[1]) if bbox else 0
+    else:
+        tw, th = draw.textsize(text, font=font)
+    x = max(pad, (img.size[0] - tw) // 2)
+    y = max(pad, img.size[1] - th - pad)
+    shadow = (0, 0, 0, 160)
+    draw.text((x + 1, y + 1), text, font=font, fill=shadow)
+    draw.text((x, y), text, font=font, fill=(255, 255, 255, 230))
+
+
+def _make_sticker(image: Image.Image, size: int, caption: str) -> Image.Image:
+    base = image.convert('RGBA')
+    base = _center_crop_square(base)
+    base = base.resize((size, size), Image.LANCZOS)
+    _draw_caption(base, caption)
+    return base
+
+
+def _auto_save_media_from_attachment(
+    me: User,
+    source_filename: str,
+    original_name: str,
+    mime: str,
+    size: int | None,
+) -> None:
+    kind = _attachment_media_kind(mime, original_name)
+    if kind not in ('gif', 'sticker'):
+        return
+    try:
+        _ensure_media_dir()
+        src = _uploads_dir() / source_filename
+        if not src.exists():
+            return
+        stamp = int(_utcnow().timestamp())
+        base = secure_filename(me.username) or f"user{me.id}"
+        ext = '.gif' if kind == 'gif' else '.png'
+        filename = f"{base}_{me.id}_{stamp}_{random.randint(1000,9999)}{ext}"
+        dest = _media_dir() / filename
+        shutil.copyfile(src, dest)
+        final_size = int(dest.stat().st_size) if dest.exists() else int(size or 0)
+        title = (Path(original_name).stem or kind)[:80]
+        _save_user_media(me, kind, title, filename, (mime or ''), final_size)
+    except Exception:
+        return
+
+
+def _is_media_file(filename: str | None) -> bool:
+    if not filename:
+        return False
+    try:
+        return UserMedia.query.filter_by(filename=filename).first() is not None
+    except Exception:
+        return False
+
+
+def _is_emoji_codepoint(ch: str) -> bool:
+    if not ch:
+        return False
+    cp = ord(ch)
+    return (
+        0x1F300 <= cp <= 0x1FAFF
+        or 0x1F100 <= cp <= 0x1F1FF
+        or 0x2600 <= cp <= 0x26FF
+        or 0x2700 <= cp <= 0x27BF
+        or 0x2300 <= cp <= 0x23FF
+        or 0xFE00 <= cp <= 0xFE0F
+    )
+
+
+def _is_regional_indicator(ch: str) -> bool:
+    if not ch:
+        return False
+    cp = ord(ch)
+    return 0x1F1E6 <= cp <= 0x1F1FF
+
+
+def _is_emoji_modifier(ch: str) -> bool:
+    if not ch:
+        return False
+    cp = ord(ch)
+    return 0x1F3FB <= cp <= 0x1F3FF
+
+
+def _extract_emojis(text: str) -> list[str]:
+    if not text:
+        return []
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if _is_regional_indicator(ch) and i + 1 < n and _is_regional_indicator(text[i + 1]):
+            out.append(ch + text[i + 1])
+            i += 2
+            continue
+        if _is_emoji_codepoint(ch):
+            seq = ch
+            j = i + 1
+            while j < n:
+                nxt = text[j]
+                if nxt == '\uFE0F' or nxt == '\u200D' or _is_emoji_modifier(nxt):
+                    seq += nxt
+                    j += 1
+                    if nxt == '\u200D' and j < n:
+                        seq += text[j]
+                        j += 1
+                    continue
+                break
+            out.append(seq)
+            i = j
+            continue
+        i += 1
+    # Preserve order, unique
+    seen = set()
+    uniq = []
+    for e in out:
+        if e in seen:
+            continue
+        seen.add(e)
+        uniq.append(e)
+    return uniq
+
+
+def _save_global_emojis_from_text(text: str) -> None:
+    emojis = _extract_emojis(text or '')
+    if not emojis:
+        return
+    try:
+        for e in emojis:
+            exists = GlobalEmoji.query.filter_by(emoji=e).first()
+            if exists:
+                continue
+            db.session.add(GlobalEmoji(emoji=e))
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return
+
+
+def _tenor_api_key() -> str:
+    return (os.environ.get('TENOR_API_KEY') or '').strip()
+
+
+def _tenor_search(query: str, limit: int = 24) -> list[dict]:
+    key = _tenor_api_key()
+    if not key:
+        raise RuntimeError('tenor_api_key_missing')
+
+    q = (query or '').strip() or 'trending'
+    try:
+        lim = int(limit)
+    except Exception:
+        lim = 24
+    lim = max(1, min(40, lim))
+
+    params = {
+        'key': key,
+        'q': q,
+        'limit': lim,
+        'media_filter': 'gif,tinygif',
+        'contentfilter': 'high',
+    }
+    r = requests.get('https://tenor.googleapis.com/v2/search', params=params, timeout=10)
+    r.raise_for_status()
+    data = r.json() or {}
+
+    out = []
+    for item in data.get('results', []) or []:
+        media = item.get('media_formats') or {}
+        gif = media.get('gif') or media.get('tinygif') or {}
+        tiny = media.get('tinygif') or gif
+        url = (gif.get('url') or '').strip()
+        preview = (tiny.get('url') or url).strip()
+        if not url:
+            continue
+        title = (item.get('content_description') or item.get('title') or 'GIF').strip()
+        out.append({
+            'id': str(item.get('id') or ''),
+            'url': url,
+            'preview': preview,
+            'title': title,
+        })
+    return out[:lim]
+
+
+def _is_allowed_gif_url(url: str) -> bool:
+    try:
+        u = urlparse(url or '')
+        if u.scheme not in ('https',):
+            return False
+        host = (u.hostname or '').lower()
+        return host.endswith('tenor.com')
+    except Exception:
+        return False
+
+
+def _download_gif(url: str, filename: str, max_bytes: int = 10 * 1024 * 1024) -> tuple[bool, int | None, str | None]:
+    try:
+        r = requests.get(url, stream=True, timeout=12)
+        if r.status_code != 200:
+            return False, None, 'download_failed'
+        ctype = (r.headers.get('Content-Type') or '').lower()
+        if 'image/gif' not in ctype:
+            return False, None, 'not_gif'
+        path = _uploads_dir() / filename
+        size = 0
+        with open(path, 'wb') as fh:
+            for chunk in r.iter_content(chunk_size=64 * 1024):
+                if not chunk:
+                    continue
+                size += len(chunk)
+                if size > max_bytes:
+                    try:
+                        fh.close()
+                    except Exception:
+                        pass
+                    try:
+                        path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    return False, None, 'file_too_large'
+                fh.write(chunk)
+        return True, size, None
+    except Exception:
+        try:
+            (_uploads_dir() / filename).unlink(missing_ok=True)
+        except Exception:
+            pass
+        return False, None, 'download_failed'
 
 
 def _message_action_window_seconds() -> int:
@@ -4214,6 +4600,8 @@ def api_send_message(other_username: str):
     db.session.add(msg)
     db.session.commit()
 
+    _save_global_emojis_from_text(content)
+
     def _is_tour_request_text(text: str) -> bool:
         t = (text or '').strip().lower()
         if not t:
@@ -4343,6 +4731,17 @@ def api_send_attachment(other_username: str):
     db.session.add(msg)
     db.session.commit()
 
+    _auto_save_media_from_attachment(
+        me,
+        filename,
+        (f.filename or '')[:140],
+        (f.mimetype or '')[:60],
+        size,
+    )
+
+    if caption:
+        _save_global_emojis_from_text(caption)
+
     # Auto-reply for NOVA (attachments are acknowledged; bot doesn't process files).
     if NOVA_ENABLED and _is_nova_username(other.username):
         try:
@@ -4356,6 +4755,323 @@ def api_send_attachment(other_username: str):
                 db.session.commit()
         except Exception:
             pass
+
+    return jsonify({'ok': True, 'id': msg.id, 'attachment_url': _attachment_url(msg)})
+
+
+@app.route('/api/emojis/library')
+def api_global_emoji_library():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    rows = GlobalEmoji.query.order_by(GlobalEmoji.created_at.desc(), GlobalEmoji.id.desc()).limit(200).all()
+    items = [r.emoji for r in rows if r and r.emoji]
+    return jsonify({'items': items})
+
+
+@app.route('/api/media/list')
+def api_media_list():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    kind = (request.args.get('kind') or '').strip().lower()
+    q = UserMedia.query.filter_by(user_id=int(me.id))
+    if kind in ('gif', 'sticker'):
+        q = q.filter_by(kind=kind)
+    rows = q.order_by(UserMedia.created_at.desc(), UserMedia.id.desc()).limit(200).all()
+    return jsonify({'items': [_media_response_payload(m) for m in rows]})
+
+
+@app.route('/api/media/upload', methods=['POST'])
+def api_media_upload():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify({'error': 'missing_file'}), 400
+
+    size = _file_size_bytes(f)
+    if size < 0:
+        return jsonify({'error': 'invalid_file'}), 400
+    if size > 10 * 1024 * 1024:
+        return jsonify({'error': 'file_too_large'}), 413
+
+    kind = _allowed_media_kind(f.mimetype or '', f.filename)
+    if kind not in ('gif', 'sticker'):
+        return jsonify({'error': 'unsupported_file_type'}), 400
+
+    _ensure_media_dir()
+
+    stamp = int(_utcnow().timestamp())
+    base = secure_filename(me.username) or f"user{me.id}"
+    title = (Path(f.filename).stem or kind)[:80]
+
+    if kind == 'gif':
+        filename = f"{base}_{me.id}_{stamp}_{random.randint(1000,9999)}.gif"
+        path = _media_dir() / filename
+        f.save(path)
+        media = _save_user_media(me, 'gif', title, filename, 'image/gif', size)
+    else:
+        try:
+            img = Image.open(f.stream)
+        except Exception:
+            return jsonify({'error': 'invalid_image'}), 400
+        target_size = 512
+        sticker = _make_sticker(img, target_size, '')
+        filename = f"{base}_{me.id}_{stamp}_{random.randint(1000,9999)}.png"
+        path = _media_dir() / filename
+        sticker.save(path, format='PNG')
+        size = int(path.stat().st_size) if path.exists() else size
+        media = _save_user_media(me, 'sticker', title, filename, 'image/png', size)
+
+    return jsonify({'item': _media_response_payload(media)})
+
+
+@app.route('/api/media/sticker', methods=['POST'])
+def api_media_create_sticker():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify({'error': 'missing_file'}), 400
+
+    size = _file_size_bytes(f)
+    if size < 0:
+        return jsonify({'error': 'invalid_file'}), 400
+    if size > 10 * 1024 * 1024:
+        return jsonify({'error': 'file_too_large'}), 413
+
+    caption = (request.form.get('caption') or '').strip()
+    try:
+        target_size = int(request.form.get('size') or '384')
+    except Exception:
+        target_size = 384
+    target_size = max(128, min(640, target_size))
+
+    try:
+        img = Image.open(f.stream)
+    except Exception:
+        return jsonify({'error': 'invalid_image'}), 400
+
+    _ensure_media_dir()
+    stamp = int(_utcnow().timestamp())
+    base = secure_filename(me.username) or f"user{me.id}"
+    title = (caption or Path(f.filename).stem or 'sticker')[:80]
+    filename = f"{base}_{me.id}_{stamp}_{random.randint(1000,9999)}.png"
+    path = _media_dir() / filename
+
+    sticker = _make_sticker(img, target_size, caption)
+    sticker.save(path, format='PNG')
+    size = int(path.stat().st_size) if path.exists() else size
+    media = _save_user_media(me, 'sticker', title, filename, 'image/png', size)
+    return jsonify({'item': _media_response_payload(media)})
+
+
+@app.route('/api/media/gif', methods=['POST'])
+def api_media_create_gif():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    frames = request.files.getlist('frames')
+    if not frames:
+        return jsonify({'error': 'missing_frames'}), 400
+    if len(frames) > 20:
+        return jsonify({'error': 'too_many_frames'}), 400
+
+    caption = (request.form.get('caption') or '').strip()
+    try:
+        delay = int(request.form.get('delay') or '120')
+    except Exception:
+        delay = 120
+    delay = max(50, min(1000, delay))
+
+    try:
+        target = int(request.form.get('size') or '320')
+    except Exception:
+        target = 320
+    target = max(128, min(640, target))
+
+    images: list[Image.Image] = []
+    for f in frames:
+        if not f or not f.filename:
+            continue
+        try:
+            img = Image.open(f.stream)
+            img = img.convert('RGBA')
+            img.thumbnail((target, target), Image.LANCZOS)
+            _draw_caption(img, caption)
+            images.append(img)
+        except Exception:
+            continue
+
+    if not images:
+        return jsonify({'error': 'invalid_frames'}), 400
+
+    _ensure_media_dir()
+    stamp = int(_utcnow().timestamp())
+    base = secure_filename(me.username) or f"user{me.id}"
+    filename = f"{base}_{me.id}_{stamp}_{random.randint(1000,9999)}.gif"
+    path = _media_dir() / filename
+
+    first, rest = images[0], images[1:]
+    first.save(
+        path,
+        format='GIF',
+        save_all=True,
+        append_images=rest,
+        duration=delay,
+        loop=0,
+        disposal=2,
+        optimize=False,
+    )
+    size = int(path.stat().st_size) if path.exists() else 0
+    title = (caption or 'gif')[:80]
+    media = _save_user_media(me, 'gif', title, filename, 'image/gif', size)
+    return jsonify({'item': _media_response_payload(media)})
+
+
+@app.route('/api/messages/<string:other_username>/media/<int:media_id>', methods=['POST'])
+def api_send_media(other_username: str, media_id: int):
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    other_username = (other_username or '').strip()
+    if _is_nova_username(other_username):
+        if not NOVA_ENABLED:
+            return jsonify({'error': 'user_not_found'}), 404
+        _get_or_create_nova_user()
+        other_username = NOVA_USERNAME
+    other = _find_user_by_username(other_username)
+    if not other:
+        return jsonify({'error': 'user_not_found'}), 404
+
+    is_self = other.id == me.id
+    if not is_self and (not _is_nova_username(other.username)) and not _is_accepted_contact(me.id, other.id):
+        return jsonify({'error': 'not_a_contact'}), 403
+
+    media = _db_get(UserMedia, media_id)
+    if not media:
+        return jsonify({'error': 'not_found'}), 404
+    if int(media.user_id) != int(me.id):
+        return jsonify({'error': 'forbidden'}), 403
+
+    msg = Message(
+        sender_id=me.id,
+        recipient_id=other.id,
+        content=encrypt_text(''),
+        attachment_filename=media.filename,
+        attachment_original=(media.title or media.filename)[:140],
+        attachment_mime=media.mime,
+        attachment_size=media.size,
+    )
+    db.session.add(msg)
+    db.session.commit()
+
+    return jsonify({'ok': True, 'id': msg.id, 'attachment_url': _attachment_url(msg)})
+
+
+@app.route('/api/gifs/search')
+def api_gif_search():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    q = (request.args.get('q') or '').strip()
+    limit = request.args.get('limit') or '24'
+
+    try:
+        results = _tenor_search(q, limit=int(limit))
+    except RuntimeError:
+        return jsonify({'error': 'gif_search_unavailable'}), 503
+    except Exception:
+        return jsonify({'error': 'gif_search_failed'}), 502
+
+    return jsonify({'results': results})
+
+
+@app.route('/api/messages/<string:other_username>/gif', methods=['POST'])
+def api_send_gif(other_username: str):
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    other_username = (other_username or '').strip()
+    if _is_nova_username(other_username):
+        if not NOVA_ENABLED:
+            return jsonify({'error': 'user_not_found'}), 404
+        _get_or_create_nova_user()
+        other_username = NOVA_USERNAME
+    other = _find_user_by_username(other_username)
+    if not other:
+        return jsonify({'error': 'user_not_found'}), 404
+
+    is_self = other.id == me.id
+    if not is_self and (not _is_nova_username(other.username)) and not _is_accepted_contact(me.id, other.id):
+        return jsonify({'error': 'not_a_contact'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    url = (payload.get('url') or '').strip()
+    title = (payload.get('title') or '').strip()
+    reply_to_id = (payload.get('reply_to_id') or '').strip()
+
+    if not url or not _is_allowed_gif_url(url):
+        return jsonify({'error': 'invalid_gif_url'}), 400
+
+    reply_to = None
+    try:
+        if reply_to_id:
+            rid = int(reply_to_id)
+            reply_to = _db_get(Message, rid)
+            if not reply_to:
+                reply_to = None
+            elif me.id not in (reply_to.sender_id, reply_to.recipient_id):
+                reply_to = None
+            elif other.id not in (reply_to.sender_id, reply_to.recipient_id):
+                reply_to = None
+    except Exception:
+        reply_to = None
+
+    _uploads_dir().mkdir(parents=True, exist_ok=True)
+
+    stamp = int(_utcnow().timestamp())
+    base = secure_filename(me.username) or f"user{me.id}"
+    filename = f"{base}_{me.id}_{stamp}_{random.randint(1000,9999)}.gif"
+    ok, size, err = _download_gif(url, filename)
+    if not ok:
+        return jsonify({'error': err or 'download_failed'}), 400
+
+    safe_title = secure_filename(title) or 'gif'
+    original = f"{safe_title}.gif"[:140]
+
+    msg = Message(
+        sender_id=me.id,
+        recipient_id=other.id,
+        content=encrypt_text(''),
+        attachment_filename=filename,
+        attachment_original=original,
+        attachment_mime='image/gif',
+        attachment_size=size or 0,
+    )
+    if reply_to:
+        msg.reply_to_id = int(reply_to.id)
+    db.session.add(msg)
+    db.session.commit()
+
+    _auto_save_media_from_attachment(
+        me,
+        filename,
+        original,
+        'image/gif',
+        size or 0,
+    )
 
     return jsonify({'ok': True, 'id': msg.id, 'attachment_url': _attachment_url(msg)})
 
@@ -4401,12 +5117,13 @@ def api_message_delete_for_everyone(message_id: int):
     # Remove attachment file if present
     fn = getattr(msg, 'attachment_filename', None)
     if fn:
-        try:
-            p = _uploads_dir() / fn
-            if p.exists():
-                p.unlink()
-        except Exception:
-            pass
+        if not _is_media_file(fn):
+            try:
+                p = _uploads_dir() / fn
+                if p.exists():
+                    p.unlink()
+            except Exception:
+                pass
 
     msg.deleted_for_all = True
     msg.edited_at = None

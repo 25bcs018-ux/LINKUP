@@ -112,6 +112,203 @@ body.bg-animated::before {
   animation: none;
 }
 
+/* New chat request plane */
+.request-plane-wrap{
+  position:fixed;
+  width:28px;
+  height:20px;
+  pointer-events:none;
+  z-index:60;
+  transform:translate(-50%, -50%) rotate(0deg);
+  animation:requestPlaneFly 900ms ease-out both;
+}
+
+.request-plane{
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(135deg, rgba(235, 210, 170, 0.96) 0 45%, rgba(210, 170, 120, 0.96) 45% 100%),
+    linear-gradient(315deg, rgba(248, 233, 200, 0.92) 0 42%, rgba(170, 120, 70, 0.0) 42% 100%);
+  clip-path:polygon(0 10%, 100% 50%, 0 90%, 30% 50%);
+  filter:drop-shadow(0 8px 16px rgba(90,60,30,0.35));
+}
+
+.request-plane-trail{
+  position:absolute;
+  left:-18vw;
+  top:50%;
+  width:18vw;
+  height:2px;
+  transform:translateY(-50%);
+  background:
+    repeating-linear-gradient(90deg, rgba(248, 233, 200, 0.9) 0 6px, rgba(248, 233, 200, 0.0) 6px 14px);
+  opacity:0.75;
+  filter:drop-shadow(0 4px 8px rgba(90,60,30,0.35));
+  animation:requestTrailFade 900ms ease-out both;
+}
+
+.request-plane-wind{
+  position:absolute;
+  left:-14vw;
+  height:2px;
+  width:12vw;
+  background:linear-gradient(90deg, rgba(255,255,255,0.0), rgba(255,255,255,0.5), rgba(255,255,255,0));
+  opacity:0.7;
+  filter:blur(0.3px);
+  animation:requestWind 900ms ease-out both;
+}
+
+.request-plane-wind.wind-1{top:-6px}
+.request-plane-wind.wind-2{top:6px; width:16vw; opacity:0.55}
+.request-plane-wind.wind-3{top:12px; width:10vw; opacity:0.45}
+
+@keyframes requestPlaneFly{
+  0%{opacity:0; transform:translate(-50%, -50%) scale(0.7) rotate(-8deg)}
+  12%{opacity:1; transform:translate(-50%, -50%) scale(1) rotate(6deg)}
+  35%{transform:translate(calc(-50% + 18vw), calc(-50% - 2vh)) scale(0.95) rotate(-6deg)}
+  60%{transform:translate(calc(-50% + 42vw), calc(-50% + 1vh)) scale(0.9) rotate(8deg)}
+  85%{transform:translate(calc(-50% + 62vw), calc(-50% - 1vh)) scale(0.8) rotate(-4deg)}
+  100%{opacity:0; transform:translate(calc(-50% + 80vw), calc(-50% + 1vh)) scale(0.6) rotate(6deg)}
+}
+
+@keyframes requestTrailFade{
+  0%{opacity:0}
+  15%{opacity:0.8}
+  100%{opacity:0}
+}
+
+@keyframes requestWind{
+  0%{opacity:0; transform:translateX(-12px)}
+  20%{opacity:0.7}
+  100%{opacity:0; transform:translateX(-6vw)}
+}
+
+/* Withdraw burst */
+.plane-burst{
+  position:fixed;
+  width:28px;
+  height:20px;
+  pointer-events:none;
+  z-index:60;
+  transform:translate(-50%, -50%);
+  animation:planeBurstFade 420ms ease-out both;
+}
+
+.plane-burst-plane{
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(135deg, rgba(235, 210, 170, 0.96) 0 45%, rgba(210, 170, 120, 0.96) 45% 100%),
+    linear-gradient(315deg, rgba(248, 233, 200, 0.92) 0 42%, rgba(170, 120, 70, 0.0) 42% 100%);
+  clip-path:polygon(0 10%, 100% 50%, 0 90%, 30% 50%);
+  filter:drop-shadow(0 6px 12px rgba(90,60,30,0.35));
+  animation:planeBurstPop 160ms ease-out both;
+}
+
+.plane-burst-piece{
+  position:absolute;
+  inset:0;
+  width:8px;
+  height:4px;
+  background:linear-gradient(135deg, rgba(235, 210, 170, 0.95), rgba(190, 150, 100, 0.9));
+  clip-path:polygon(0 0, 100% 50%, 0 100%);
+  transform:rotate(var(--burst-angle)) translateX(0);
+  animation:planeBurstPiece 420ms ease-out both;
+  animation-delay: var(--burst-delay);
+}
+
+@keyframes planeBurstFade{
+  0%{opacity:1}
+  100%{opacity:0}
+}
+
+@keyframes planeBurstPop{
+  0%{opacity:0; transform:scale(0.7)}
+  100%{opacity:1; transform:scale(1)}
+}
+
+@keyframes planeBurstPiece{
+  0%{transform:rotate(var(--burst-angle)) translateX(0) scale(1)}
+  100%{transform:rotate(var(--burst-angle)) translateX(6vw) scale(0.35)}
+}
+
+/* Delete dump animation */
+.delete-dump{
+  position:fixed;
+  z-index:70;
+  pointer-events:none;
+  width:160px;
+  height:120px;
+  transform:translate(-50%, -50%);
+  animation:deleteDumpScene 780ms ease-out both;
+}
+
+.delete-dump-nova{
+  position:absolute;
+  left:-10px;
+  top:10px;
+  width:46px;
+  height:46px;
+  border-radius:14px;
+  background:
+    url('nova_mascot.svg') center/cover no-repeat,
+    linear-gradient(135deg, rgba(255,45,149,0.45), rgba(34,211,238,0.35));
+  border:1px solid rgba(255,255,255,0.18);
+  box-shadow:0 10px 26px rgba(0,0,0,0.35);
+}
+
+.delete-dump-bin{
+  position:absolute;
+  right:0;
+  bottom:0;
+  width:54px;
+  height:58px;
+  border-radius:10px 10px 14px 14px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.18), rgba(0,0,0,0.2));
+  border:1px solid rgba(255,255,255,0.2);
+  box-shadow:0 12px 30px rgba(0,0,0,0.35);
+}
+
+.delete-dump-bin::before{
+  content:"";
+  position:absolute;
+  top:-10px;
+  left:4px;
+  right:4px;
+  height:12px;
+  border-radius:8px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.3), rgba(0,0,0,0.2));
+  border:1px solid rgba(255,255,255,0.2);
+}
+
+.delete-dump-bubble{
+  position:absolute;
+  left:36px;
+  top:24px;
+  max-width:90px;
+  padding:6px 8px;
+  border-radius:10px;
+  background:rgba(0,0,0,0.45);
+  color:rgba(255,255,255,0.85);
+  font-size:10px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  animation:deleteDumpToss 780ms ease-out both;
+}
+
+@keyframes deleteDumpScene{
+  0%{opacity:0; transform:translate(-50%, -50%) scale(0.9)}
+  15%{opacity:1}
+  100%{opacity:0; transform:translate(-50%, -60%) scale(0.95)}
+}
+
+@keyframes deleteDumpToss{
+  0%{transform:translateX(0) translateY(0) rotate(-6deg)}
+  55%{transform:translateX(34px) translateY(-10px) rotate(6deg)}
+  100%{transform:translateX(62px) translateY(26px) rotate(18deg); opacity:0}
+}
+
 @keyframes bgDrift {
   0% { transform: translate3d(-2%, -1%, 0) scale(1.00); }
   50% { transform: translate3d(2%, 1.5%, 0) scale(1.06); }
@@ -2913,6 +3110,70 @@ a { color: inherit; text-decoration: none; }
 
 .emoji-item:hover { background: rgba(255,255,255,0.06); }
 
+.emoji-section-title {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 6px 2px 4px;
+}
+
+.gif-tabs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.gif-tab {
+  appearance: none;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gif-tab.active {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.35);
+}
+
+.gif-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 8px 2px 6px;
+}
+
+.gif-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 2px;
+}
+
+.gif-item {
+  appearance: none;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.gif-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .attach-chip {
   display: flex;
   align-items: center;
@@ -3012,6 +3273,69 @@ a { color: inherit; text-decoration: none; }
   width: 100%;
   max-height: 260px;
   object-fit: cover;
+  cursor: zoom-in;
+}
+
+.bubble .att.att-sticker {
+  border: none;
+  background: transparent;
+}
+
+.bubble .att-img.att-sticker {
+  width: auto;
+  max-width: 220px;
+  max-height: 220px;
+  object-fit: contain;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+.lightbox.show { display: grid; }
+
+.lightbox-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 10, 16, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.lightbox-body {
+  position: relative;
+  max-width: min(92vw, 980px);
+  max-height: min(86vh, 760px);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.55);
+  background: rgba(0,0,0,0.2);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.55);
+  color: rgba(255,255,255,0.92);
+  border-radius: 12px;
+  width: 40px;
+  height: 36px;
+  cursor: pointer;
 }
 
 .bubble .att-file {

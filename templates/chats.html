@@ -33,7 +33,8 @@
             <div class="avatar" id="meAvatar" aria-hidden="true"></div>
             <div style="min-width: 0; text-align:left;">
               <strong id="meTitle">{{ me.display_name or me.username }}</strong>
-              <span id="meSub">{% if me.about %}{{ me.about }}{% else %}@{{ me.username }}{% endif %}</span>
+              <span id="meSub">@{{ me.username }}</span>
+              <span id="meAbout" class="{% if not me.about %}hidden{% endif %}">{{ me.about }}</span>
             </div>
           </button>
           <div class="sb-actions">
@@ -190,7 +191,11 @@
 
         <form class="composer" id="composer" autocomplete="off">
           <button class="cbtn" id="emojiBtn" type="button" aria-label="Emoji" {% if not has_active_chat %}disabled{% endif %}>😊</button>
+          <button class="cbtn" id="gifBtn" type="button" aria-label="Send GIF" {% if not has_active_chat or active_kind == 'group' %}disabled{% endif %}>🎞️</button>
+          <button class="cbtn" id="stickerBtn" type="button" aria-label="Send sticker" {% if not has_active_chat or active_kind == 'group' %}disabled{% endif %}>🧩</button>
           <button class="cbtn" id="attachBtn" type="button" aria-label="Attach file" {% if not has_active_chat or active_kind == 'group' %}disabled{% endif %}>📎</button>
+          <input class="hidden" id="gifUploadInput" type="file" accept="image/gif" />
+          <input class="hidden" id="stickerInput" type="file" accept="image/png,image/webp" />
           <input class="hidden" id="attachInput" type="file" accept="image/*,.pdf,.txt,.zip" />
 
           <div class="composer-pop" id="composerPop" aria-label="Composer tools">
@@ -233,6 +238,14 @@
         <button class="x" id="dlgClose" type="button" aria-label="Close">✕</button>
       </div>
       <div class="dlg-bd" id="dlgBody"></div>
+    </div>
+  </div>
+
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <div class="lightbox-scrim" id="lightboxScrim" aria-hidden="true"></div>
+    <div class="lightbox-body" role="dialog" aria-modal="true" aria-label="Image preview">
+      <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Close">✕</button>
+      <img class="lightbox-img" id="lightboxImg" alt="" />
     </div>
   </div>
 
@@ -363,6 +376,7 @@
     const chatList = document.getElementById('chatList');
     const meTitleEl = document.getElementById('meTitle');
     const meSubEl = document.getElementById('meSub');
+    const meAboutEl = document.getElementById('meAbout');
     const meAvatarEl = document.getElementById('meAvatar');
     const peerAvatarEl = document.getElementById('peerAvatar');
     const chatKebab = document.getElementById('chatKebab');
@@ -400,6 +414,10 @@
 
     const emojiBtn = document.getElementById('emojiBtn');
     const emojiPanel = document.getElementById('emojiPanel');
+    const gifBtn = document.getElementById('gifBtn');
+    const gifUploadInput = document.getElementById('gifUploadInput');
+    const stickerBtn = document.getElementById('stickerBtn');
+    const stickerInput = document.getElementById('stickerInput');
     const attachBtn = document.getElementById('attachBtn');
     const attachInput = document.getElementById('attachInput');
     const attachChip = document.getElementById('attachChip');
@@ -419,6 +437,11 @@
     const dlgBody = document.getElementById('dlgBody');
     const dlgClose = document.getElementById('dlgClose');
     const toasts = document.getElementById('toasts');
+
+    const lightbox = document.getElementById('lightbox');
+    const lightboxScrim = document.getElementById('lightboxScrim');
+    const lightboxClose = document.getElementById('lightboxClose');
+    const lightboxImg = document.getElementById('lightboxImg');
 
     const popScrim = document.getElementById('popScrim');
     const popMenu = document.getElementById('popMenu');
@@ -1348,6 +1371,28 @@
       if (e.key === 'Escape' && overlay.classList.contains('show')) closeDialog();
     });
 
+    function openLightbox(src, alt) {
+      if (!lightbox || !lightboxImg) return;
+      lightboxImg.src = src || '';
+      lightboxImg.alt = alt || 'Image preview';
+      lightbox.classList.add('show');
+      lightbox.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeLightbox() {
+      if (!lightbox || !lightboxImg) return;
+      lightbox.classList.remove('show');
+      lightbox.setAttribute('aria-hidden', 'true');
+      lightboxImg.src = '';
+      lightboxImg.alt = '';
+    }
+
+    lightboxScrim?.addEventListener('click', closeLightbox);
+    lightboxClose?.addEventListener('click', closeLightbox);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lightbox?.classList.contains('show')) closeLightbox();
+    });
+
     // ------------------ Anchored Popover Menu ------------------
     let popOpen = false;
     let popOnCloseFocus = null;
@@ -1874,16 +1919,23 @@
           const isImage = mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(url);
 
           if (isImage) {
-            const a = document.createElement('a');
-            a.href = url;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
             const img = document.createElement('img');
             img.className = 'att-img';
             img.alt = name;
             img.src = url;
-            a.appendChild(img);
-            wrap.appendChild(a);
+            img.addEventListener('click', () => openLightbox(url, name));
+            const markSticker = () => {
+              const w = img.naturalWidth || 0;
+              const h = img.naturalHeight || 0;
+              const maxSide = Math.max(w, h);
+              if (maxSide && maxSide <= 220) {
+                img.classList.add('att-sticker');
+                wrap.classList.add('att-sticker');
+              }
+            };
+            img.addEventListener('load', markSticker);
+            if (img.complete) markSticker();
+            wrap.appendChild(img);
           } else {
             const a = document.createElement('a');
             a.className = 'att-file';
@@ -2169,6 +2221,7 @@
             document.getElementById('delCancel')?.addEventListener('click', closeDialog);
             document.getElementById('delConfirm')?.addEventListener('click', async () => {
               try {
+                launchDeleteDump(messageInput, m.content || m.attachment_name || 'Message');
                 await apiPost(`/api/message/${encodeURIComponent(m.id)}/delete_for_me`);
                 closeDialog();
                 toast('Deleted');
@@ -2199,6 +2252,7 @@
             document.getElementById('delAllCancel')?.addEventListener('click', closeDialog);
             document.getElementById('delAllConfirm')?.addEventListener('click', async () => {
               try {
+                launchDeleteDump(messageInput, m.content || m.attachment_name || 'Message');
                 await apiPost(`/api/message/${encodeURIComponent(m.id)}/delete_for_everyone`);
                 closeDialog();
                 toast('Deleted for everyone');
@@ -2223,6 +2277,7 @@
 
     messagesEl?.addEventListener('click', (e) => {
       if (e.target?.closest?.('a, button, input, textarea, select, label')) return;
+      if (e.target?.closest?.('.att-img, .lightbox, .lightbox-body')) return;
       const bubble = e.target?.closest?.('.bubble');
       if (!bubble) return;
       const mid = bubble.dataset.mid;
@@ -3436,6 +3491,233 @@
       }
     }
 
+    async function sendGif(url, title) {
+      if (activeKind === 'group') {
+        throw new Error('attachments_not_supported_for_groups');
+      }
+      const res = await fetch(`/api/messages/${encodeURIComponent(activeUsername)}/gif`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          title,
+          reply_to_id: replyToId || null
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to send');
+      }
+    }
+
+    async function sendLocalGif(url, title) {
+      if (!url) throw new Error('missing_gif');
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('gif_fetch_failed');
+      const blob = await res.blob();
+      const name = (title && String(title).trim()) ? `${title}.gif` : 'gif.gif';
+      const file = new File([blob], name, { type: 'image/gif' });
+      await sendAttachment(file, '');
+    }
+
+    async function sendLocalSticker(url, title, mime) {
+      if (!url) throw new Error('missing_sticker');
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('sticker_fetch_failed');
+      const blob = await res.blob();
+      const ext = (mime === 'image/webp') ? 'webp' : 'png';
+      const name = (title && String(title).trim()) ? `${title}.${ext}` : `sticker.${ext}`;
+      const file = new File([blob], name, { type: mime || 'image/png' });
+      await sendAttachment(file, '');
+    }
+
+    async function sendMedia(mediaId) {
+      if (activeKind === 'group') {
+        throw new Error('attachments_not_supported_for_groups');
+      }
+      const res = await fetch(`/api/messages/${encodeURIComponent(activeUsername)}/media/${encodeURIComponent(String(mediaId))}`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to send');
+      }
+    }
+
+    async function uploadToLibrary(file) {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Upload failed');
+      }
+      const data = await res.json().catch(() => ({}));
+      return data.item;
+    }
+
+    async function loadMyMedia(kind, grid, meta) {
+      if (!grid) return [];
+      grid.innerHTML = '<div class="hint">Loading...</div>';
+      try {
+        const res = await fetch(`/api/media/list?kind=${encodeURIComponent(kind || '')}`);
+        if (!res.ok) throw new Error('media_list_failed');
+        const data = await res.json().catch(() => ({}));
+        const items = Array.isArray(data.items) ? data.items : [];
+        grid.innerHTML = '';
+        if (!items.length) {
+          grid.innerHTML = '<div class="hint">No items yet.</div>';
+          return [];
+        }
+        items.forEach((g) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'gif-item';
+          btn.setAttribute('aria-label', g.title || 'media');
+          const img = document.createElement('img');
+          img.alt = g.title || 'media';
+          img.loading = 'lazy';
+          img.src = g.url;
+          btn.appendChild(img);
+          btn.addEventListener('click', async () => {
+            try {
+              if (meta) meta.textContent = 'Sending...';
+              await sendMedia(g.id);
+              closeDialog();
+              await refreshMessages();
+            } catch (e) {
+              toast('Send failed', e.message || 'Try again');
+            }
+          });
+          grid.appendChild(btn);
+        });
+        return items;
+      } catch (e) {
+        grid.innerHTML = '<div class="hint">Library unavailable.</div>';
+        if (meta) meta.textContent = 'Library unavailable';
+        return [];
+      }
+    }
+
+    function openMediaCreator(defaultTab) {
+      openDialog('Create media', `
+        <div class="gif-tabs" role="tablist">
+          <button class="gif-tab" type="button" id="createTabSticker" role="tab">Sticker</button>
+          <button class="gif-tab" type="button" id="createTabGif" role="tab">GIF</button>
+          <span style="flex:1"></span>
+          <button class="btn" type="button" id="createClose">Close</button>
+        </div>
+
+        <div id="createStickerPanel">
+          <div class="dlg-card">
+            <div class="dlg-sec">Sticker maker</div>
+            <input type="file" id="createStickerFile" accept="image/*" />
+            <input class="dlg-input" id="createStickerCaption" placeholder="Caption (optional)" />
+            <div class="row" style="margin-top:8px;">
+              <span class="badge">Size</span>
+              <select id="createStickerSize">
+                <option value="256">256</option>
+                <option value="384" selected>384</option>
+                <option value="512">512</option>
+              </select>
+              <span style="flex:1"></span>
+              <button class="btn primary" type="button" id="createStickerBtn">Create sticker</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="createGifPanel" class="hidden">
+          <div class="dlg-card">
+            <div class="dlg-sec">GIF maker</div>
+            <input type="file" id="createGifFiles" accept="image/*" multiple />
+            <input class="dlg-input" id="createGifCaption" placeholder="Caption (optional)" />
+            <div class="row" style="margin-top:8px;">
+              <span class="badge">Delay (ms)</span>
+              <input class="dlg-input" id="createGifDelay" value="120" style="max-width:120px;" />
+              <span class="badge">Size</span>
+              <input class="dlg-input" id="createGifSize" value="320" style="max-width:120px;" />
+              <span style="flex:1"></span>
+              <button class="btn primary" type="button" id="createGifBtn">Create GIF</button>
+            </div>
+          </div>
+        </div>
+      `);
+
+      const tabSticker = document.getElementById('createTabSticker');
+      const tabGif = document.getElementById('createTabGif');
+      const panelSticker = document.getElementById('createStickerPanel');
+      const panelGif = document.getElementById('createGifPanel');
+
+      function showCreateTab(which) {
+        const w = String(which || 'sticker');
+        const isSticker = w === 'sticker';
+        panelSticker?.classList.toggle('hidden', !isSticker);
+        panelGif?.classList.toggle('hidden', isSticker);
+        tabSticker?.classList.toggle('active', isSticker);
+        tabGif?.classList.toggle('active', !isSticker);
+      }
+
+      tabSticker?.addEventListener('click', () => showCreateTab('sticker'));
+      tabGif?.addEventListener('click', () => showCreateTab('gif'));
+      showCreateTab(defaultTab || 'sticker');
+
+      document.getElementById('createClose')?.addEventListener('click', closeDialog);
+
+      document.getElementById('createStickerBtn')?.addEventListener('click', async () => {
+        const fileInput = document.getElementById('createStickerFile');
+        const captionEl = document.getElementById('createStickerCaption');
+        const sizeEl = document.getElementById('createStickerSize');
+        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+        if (!file) {
+          toast('Sticker', 'Select an image first');
+          return;
+        }
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('caption', (captionEl?.value || '').trim());
+        fd.append('size', (sizeEl?.value || '384'));
+        try {
+          const res = await fetch('/api/media/sticker', { method: 'POST', body: fd });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'Create failed');
+          }
+          toast('Sticker created', 'Saved to your library');
+          closeDialog();
+        } catch (e) {
+          toast('Sticker failed', e.message || 'Try again');
+        }
+      });
+
+      document.getElementById('createGifBtn')?.addEventListener('click', async () => {
+        const filesEl = document.getElementById('createGifFiles');
+        const captionEl = document.getElementById('createGifCaption');
+        const delayEl = document.getElementById('createGifDelay');
+        const sizeEl = document.getElementById('createGifSize');
+        const files = filesEl && filesEl.files ? Array.from(filesEl.files) : [];
+        if (!files.length) {
+          toast('GIF', 'Select at least one image');
+          return;
+        }
+        const fd = new FormData();
+        files.slice(0, 20).forEach((f) => fd.append('frames', f));
+        fd.append('caption', (captionEl?.value || '').trim());
+        fd.append('delay', (delayEl?.value || '120'));
+        fd.append('size', (sizeEl?.value || '320'));
+        try {
+          const res = await fetch('/api/media/gif', { method: 'POST', body: fd });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'Create failed');
+          }
+          toast('GIF created', 'Saved to your library');
+          closeDialog();
+        } catch (e) {
+          toast('GIF failed', e.message || 'Try again');
+        }
+      });
+    }
+
     let selectedFile = null;
     let replyToId = null;
     let replyToObj = null;
@@ -3462,6 +3744,7 @@
         attachChip.classList.add('hidden');
         attachName.textContent = '';
         if (attachInput) attachInput.value = '';
+        if (stickerInput) stickerInput.value = '';
         return;
       }
       const size = selectedFile.size ? ` (${fmtBytes(selectedFile.size)})` : '';
@@ -3469,27 +3752,307 @@
       attachChip.classList.remove('hidden');
     }
 
+    function handleFileInput(input) {
+      const f = input && input.files && input.files[0] ? input.files[0] : null;
+      if (!f) return;
+      if (f.size > 10 * 1024 * 1024) {
+        toast('File too large', 'Max 10MB');
+        setSelectedFile(null);
+        return;
+      }
+      setSelectedFile(f);
+    }
+
     if (attachBtn && attachInput) {
       attachBtn.addEventListener('click', () => attachInput.click());
       attachInput.addEventListener('change', () => {
-        const f = attachInput.files && attachInput.files[0] ? attachInput.files[0] : null;
-        if (!f) return;
-        if (f.size > 10 * 1024 * 1024) {
-          toast('File too large', 'Max 10MB');
-          setSelectedFile(null);
-          return;
-        }
-        setSelectedFile(f);
+        handleFileInput(attachInput);
       });
     }
+
+    if (stickerBtn) {
+      stickerBtn.addEventListener('click', () => {
+        if (activeKind === 'group') {
+          if (!activeGroupId) return;
+        } else {
+          if (!activeUsername) return;
+        }
+        openStickerPicker();
+      });
+    }
+
+    function openGifPicker() {
+      openDialog('GIFs', `
+        <div class="gif-tabs" role="tablist">
+          <button class="gif-tab active" type="button" id="gifTabMine" role="tab" aria-selected="true">My GIFs</button>
+          <button class="gif-tab" type="button" id="gifTabLocal" role="tab" aria-selected="false">Local pack</button>
+          <span style="flex:1"></span>
+          <button class="btn" type="button" id="gifCreateBtn">Create GIF</button>
+          <button class="btn" type="button" id="gifUploadBtn">Upload GIF</button>
+        </div>
+
+        <div id="gifPanelMine">
+          <div class="gif-meta" id="gifMeta">Your GIF library</div>
+          <div class="gif-grid" id="gifGrid"></div>
+        </div>
+
+        <div id="gifPanelLocal" class="hidden">
+          <div class="gif-meta" id="gifLocalMeta">Local GIF pack</div>
+          <div class="gif-grid" id="gifLocalGrid"></div>
+          <div class="hint" style="text-align:center;">Add GIFs in static/gifs/manifest.json</div>
+        </div>
+
+        <div class="dlg-actions">
+          <button class="btn" type="button" id="gifClose">Close</button>
+        </div>
+      `);
+
+      const tabMine = document.getElementById('gifTabMine');
+      const tabLocal = document.getElementById('gifTabLocal');
+      const panelMine = document.getElementById('gifPanelMine');
+      const panelLocal = document.getElementById('gifPanelLocal');
+      const uploadBtn = document.getElementById('gifUploadBtn');
+      const createBtn = document.getElementById('gifCreateBtn');
+      const grid = document.getElementById('gifGrid');
+      const meta = document.getElementById('gifMeta');
+      const localGrid = document.getElementById('gifLocalGrid');
+      const localMeta = document.getElementById('gifLocalMeta');
+      let localLoaded = false;
+
+      async function loadLocalGifs() {
+        if (localLoaded) return;
+        localLoaded = true;
+        if (localGrid) localGrid.innerHTML = '<div class="hint">Loading...</div>';
+        try {
+          const res = await fetch('/static/gifs/manifest.json', { cache: 'no-store' });
+          if (!res.ok) throw new Error('manifest_not_found');
+          const data = await res.json();
+          const items = Array.isArray(data.items) ? data.items : [];
+          if (!localGrid) return;
+          localGrid.innerHTML = '';
+          if (!items.length) {
+            localGrid.innerHTML = '<div class="hint">No local GIFs yet.</div>';
+            return;
+          }
+          items.forEach((g) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'gif-item';
+            btn.setAttribute('aria-label', g.title || 'GIF');
+            const img = document.createElement('img');
+            img.alt = g.title || 'GIF';
+            img.loading = 'lazy';
+            img.src = g.preview || g.url;
+            btn.appendChild(img);
+            btn.addEventListener('click', async () => {
+              try {
+                if (localMeta) localMeta.textContent = 'Sending...';
+                await sendLocalGif(g.url, g.title || 'GIF');
+                closeDialog();
+                await refreshMessages();
+              } catch (e) {
+                toast('GIF failed', e.message || 'Try again');
+              }
+            });
+            localGrid.appendChild(btn);
+          });
+        } catch (e) {
+          if (localGrid) localGrid.innerHTML = '<div class="hint">Local GIFs not available.</div>';
+          if (localMeta) localMeta.textContent = 'Missing manifest.json';
+        }
+      }
+
+      function showGifTab(which) {
+        const w = String(which || 'mine');
+        const isMine = w === 'mine';
+        panelMine?.classList.toggle('hidden', !isMine);
+        panelLocal?.classList.toggle('hidden', isMine);
+        tabMine?.classList.toggle('active', isMine);
+        tabLocal?.classList.toggle('active', !isMine);
+        tabMine?.setAttribute('aria-selected', isMine ? 'true' : 'false');
+        tabLocal?.setAttribute('aria-selected', !isMine ? 'true' : 'false');
+        if (!isMine) loadLocalGifs();
+      }
+
+      tabMine?.addEventListener('click', () => showGifTab('mine'));
+      tabLocal?.addEventListener('click', () => showGifTab('local'));
+
+      createBtn?.addEventListener('click', () => {
+        openMediaCreator('gif');
+      });
+
+      if (uploadBtn && gifUploadInput) {
+        uploadBtn.addEventListener('click', () => gifUploadInput.click());
+        gifUploadInput.onchange = async () => {
+          const f = gifUploadInput.files && gifUploadInput.files[0] ? gifUploadInput.files[0] : null;
+          gifUploadInput.value = '';
+          if (!f) return;
+          if (f.size > 10 * 1024 * 1024) {
+            toast('File too large', 'Max 10MB');
+            return;
+          }
+          try {
+            await uploadToLibrary(f);
+            await loadMyMedia('gif', grid, meta);
+            toast('GIF added', 'Saved to your library');
+          } catch (e) {
+            toast('GIF failed', e.message || 'Try again');
+          }
+        };
+      }
+
+      document.getElementById('gifClose')?.addEventListener('click', closeDialog);
+
+      loadMyMedia('gif', grid, meta);
+      showGifTab('mine');
+    }
+
+    function openStickerPicker() {
+      openDialog('Stickers', `
+        <div class="gif-tabs" role="tablist">
+          <button class="gif-tab active" type="button" id="stickerTabMine" role="tab" aria-selected="true">My stickers</button>
+          <button class="gif-tab" type="button" id="stickerTabLocal" role="tab" aria-selected="false">Local pack</button>
+          <span style="flex:1"></span>
+          <button class="btn" type="button" id="stickerCreateBtn">Create sticker</button>
+          <button class="btn" type="button" id="stickerUploadBtn">Upload sticker</button>
+        </div>
+
+        <div id="stickerPanelMine">
+          <div class="gif-meta" id="stickerMeta">Your sticker library</div>
+          <div class="gif-grid" id="stickerGrid"></div>
+        </div>
+
+        <div id="stickerPanelLocal" class="hidden">
+          <div class="gif-meta" id="stickerLocalMeta">Local sticker pack</div>
+          <div class="gif-grid" id="stickerLocalGrid"></div>
+          <div class="hint" style="text-align:center;">Add stickers in static/stickers/manifest.json</div>
+        </div>
+
+        <div class="dlg-actions">
+          <button class="btn" type="button" id="stickerClose">Close</button>
+        </div>
+      `);
+
+      const tabMine = document.getElementById('stickerTabMine');
+      const tabLocal = document.getElementById('stickerTabLocal');
+      const panelMine = document.getElementById('stickerPanelMine');
+      const panelLocal = document.getElementById('stickerPanelLocal');
+      const uploadBtn = document.getElementById('stickerUploadBtn');
+      const createBtn = document.getElementById('stickerCreateBtn');
+      const grid = document.getElementById('stickerGrid');
+      const meta = document.getElementById('stickerMeta');
+      const localGrid = document.getElementById('stickerLocalGrid');
+      const localMeta = document.getElementById('stickerLocalMeta');
+      let localLoaded = false;
+
+      async function loadLocalStickers() {
+        if (localLoaded) return;
+        localLoaded = true;
+        if (localGrid) localGrid.innerHTML = '<div class="hint">Loading...</div>';
+        try {
+          const res = await fetch('/static/stickers/manifest.json', { cache: 'no-store' });
+          if (!res.ok) throw new Error('manifest_not_found');
+          const data = await res.json();
+          const items = Array.isArray(data.items) ? data.items : [];
+          if (!localGrid) return;
+          localGrid.innerHTML = '';
+          if (!items.length) {
+            localGrid.innerHTML = '<div class="hint">No local stickers yet.</div>';
+            return;
+          }
+          items.forEach((g) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'gif-item';
+            btn.setAttribute('aria-label', g.title || 'Sticker');
+            const img = document.createElement('img');
+            img.alt = g.title || 'Sticker';
+            img.loading = 'lazy';
+            img.src = g.preview || g.url;
+            btn.appendChild(img);
+            btn.addEventListener('click', async () => {
+              try {
+                if (localMeta) localMeta.textContent = 'Sending...';
+                await sendLocalSticker(g.url, g.title || 'Sticker', g.mime || 'image/png');
+                closeDialog();
+                await refreshMessages();
+              } catch (e) {
+                toast('Sticker failed', e.message || 'Try again');
+              }
+            });
+            localGrid.appendChild(btn);
+          });
+        } catch (e) {
+          if (localGrid) localGrid.innerHTML = '<div class="hint">Local stickers not available.</div>';
+          if (localMeta) localMeta.textContent = 'Missing manifest.json';
+        }
+      }
+
+      function showStickerTab(which) {
+        const w = String(which || 'mine');
+        const isMine = w === 'mine';
+        panelMine?.classList.toggle('hidden', !isMine);
+        panelLocal?.classList.toggle('hidden', isMine);
+        tabMine?.classList.toggle('active', isMine);
+        tabLocal?.classList.toggle('active', !isMine);
+        tabMine?.setAttribute('aria-selected', isMine ? 'true' : 'false');
+        tabLocal?.setAttribute('aria-selected', !isMine ? 'true' : 'false');
+        if (!isMine) loadLocalStickers();
+      }
+
+      tabMine?.addEventListener('click', () => showStickerTab('mine'));
+      tabLocal?.addEventListener('click', () => showStickerTab('local'));
+
+      createBtn?.addEventListener('click', () => {
+        openMediaCreator('sticker');
+      });
+
+      if (uploadBtn && stickerInput) {
+        uploadBtn.addEventListener('click', () => stickerInput.click());
+        stickerInput.onchange = async () => {
+          const f = stickerInput.files && stickerInput.files[0] ? stickerInput.files[0] : null;
+          stickerInput.value = '';
+          if (!f) return;
+          if (f.size > 10 * 1024 * 1024) {
+            toast('File too large', 'Max 10MB');
+            return;
+          }
+          try {
+            await uploadToLibrary(f);
+            await loadMyMedia('sticker', grid, meta);
+            toast('Sticker added', 'Saved to your library');
+          } catch (e) {
+            toast('Sticker failed', e.message || 'Try again');
+          }
+        };
+      }
+
+      document.getElementById('stickerClose')?.addEventListener('click', closeDialog);
+
+      loadMyMedia('sticker', grid, meta);
+      showStickerTab('mine');
+    }
+
+    gifBtn?.addEventListener('click', () => {
+      if (activeKind === 'group') {
+        if (!activeGroupId) return;
+      } else {
+        if (!activeUsername) return;
+      }
+      openGifPicker();
+    });
 
     attachClear?.addEventListener('click', () => setSelectedFile(null));
     replyClear?.addEventListener('click', () => setReplyTo(null));
 
     const EMOJIS = [
       '😀','😁','😂','🤣','😊','😍','😘','😎','🥳','😅','😢','😡',
-      '👍','👎','🙏','👏','💪','🔥','✨','💯','✅','❌','🎉','❤️',
-      '📎','📷','🎵','📍','🧠','💡','⌛','🌙','🌟','🍀','⚡','🚀'
+      '😴','🤔','😬','😇','🤩','🤯','🥺','😭','😤','😱','😈','🤡',
+      '👍','👎','🙏','👏','💪','🙌','🤝','🫶','🤞','✌️','🖐️','🤙',
+      '🔥','✨','💯','✅','❌','🎉','❤️','💔','💜','💙','💚','🩵',
+      '📎','📷','🎵','🎧','🎮','📍','🧠','💡','⌛','🌙','🌟','🍀',
+      '⚡','🚀','🌈','☀️','🌧️','❄️','🍕','🍔','🍟','☕','🍩','🧋',
+      '⚽','🏀','🏈','🎯','🎲','🧭','🗓️','📝','🧪','🛡️','🔒','🔑'
     ];
 
     function toggleEmojiPanel(force) {
@@ -3499,11 +4062,10 @@
       else emojiPanel.classList.add('hidden');
     }
 
-    if (emojiPanel) {
-      emojiPanel.innerHTML = '';
+    function buildEmojiGrid(list) {
       const grid = document.createElement('div');
       grid.className = 'emoji-grid';
-      for (const e of EMOJIS) {
+      for (const e of list) {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'emoji-item';
@@ -3514,7 +4076,39 @@
         });
         grid.appendChild(b);
       }
-      emojiPanel.appendChild(grid);
+      return grid;
+    }
+
+    function renderEmojiPanel(library) {
+      if (!emojiPanel) return;
+      emojiPanel.innerHTML = '';
+
+      const lib = Array.isArray(library) ? library.filter(Boolean) : [];
+      if (lib.length) {
+        const title = document.createElement('div');
+        title.className = 'emoji-section-title';
+        title.textContent = 'Library';
+        emojiPanel.appendChild(title);
+        emojiPanel.appendChild(buildEmojiGrid(lib));
+      }
+
+      const title2 = document.createElement('div');
+      title2.className = 'emoji-section-title';
+      title2.textContent = 'All';
+      emojiPanel.appendChild(title2);
+      emojiPanel.appendChild(buildEmojiGrid(EMOJIS));
+    }
+
+    renderEmojiPanel([]);
+
+    if (emojiPanel) {
+      fetch('/api/emojis/library')
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          const lib = data && Array.isArray(data.items) ? data.items : [];
+          renderEmojiPanel(lib);
+        })
+        .catch(() => {});
     }
 
     emojiBtn?.addEventListener('click', () => {
@@ -3858,6 +4452,7 @@
         btn.addEventListener('click', async () => {
           const username = btn.getAttribute('data-withdraw');
           if (!username) return;
+          launchPlaneBurst(btn);
           try {
             await withdrawContactRequest(username);
             toast('Request withdrawn', username);
@@ -4144,6 +4739,101 @@
       throw new Error(msg);
     }
 
+    function launchRequestPlane(anchor) {
+      try {
+        if (!anchor) return;
+        const rect = anchor.getBoundingClientRect();
+        const planeWrap = document.createElement('div');
+        planeWrap.className = 'request-plane-wrap';
+        planeWrap.style.left = `${rect.left + rect.width / 2}px`;
+        planeWrap.style.top = `${rect.top + rect.height / 2}px`;
+
+        const trail = document.createElement('div');
+        trail.className = 'request-plane-trail';
+
+        const wind1 = document.createElement('div');
+        wind1.className = 'request-plane-wind wind-1';
+        const wind2 = document.createElement('div');
+        wind2.className = 'request-plane-wind wind-2';
+        const wind3 = document.createElement('div');
+        wind3.className = 'request-plane-wind wind-3';
+
+        const plane = document.createElement('div');
+        plane.className = 'request-plane';
+
+        planeWrap.appendChild(trail);
+        planeWrap.appendChild(wind1);
+        planeWrap.appendChild(wind2);
+        planeWrap.appendChild(wind3);
+        planeWrap.appendChild(plane);
+        document.body.appendChild(planeWrap);
+        planeWrap.addEventListener('animationend', () => {
+          try { planeWrap.remove(); } catch {}
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    function launchPlaneBurst(anchor) {
+      try {
+        if (!anchor) return;
+        const rect = anchor.getBoundingClientRect();
+        const burst = document.createElement('div');
+        burst.className = 'plane-burst';
+        burst.style.left = `${rect.left + rect.width / 2}px`;
+        burst.style.top = `${rect.top + rect.height / 2}px`;
+        const plane = document.createElement('div');
+        plane.className = 'plane-burst-plane';
+        burst.appendChild(plane);
+        for (let i = 0; i < 6; i += 1) {
+          const piece = document.createElement('span');
+          piece.className = 'plane-burst-piece';
+          piece.style.setProperty('--burst-angle', `${i * 60}deg`);
+          piece.style.setProperty('--burst-delay', `${i * 20}ms`);
+          burst.appendChild(piece);
+        }
+        document.body.appendChild(burst);
+        burst.addEventListener('animationend', () => {
+          try { burst.remove(); } catch {}
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    function launchDeleteDump(anchor, text) {
+      try {
+        const msg = String(text || '').trim();
+        const rect = anchor ? anchor.getBoundingClientRect() : null;
+        const x = rect ? (rect.left + rect.width / 2) : (window.innerWidth / 2);
+        const y = rect ? (rect.top + rect.height / 2) : (window.innerHeight / 2);
+        const wrap = document.createElement('div');
+        wrap.className = 'delete-dump';
+        wrap.style.left = `${x}px`;
+        wrap.style.top = `${y}px`;
+
+        const nova = document.createElement('div');
+        nova.className = 'delete-dump-nova';
+        const bin = document.createElement('div');
+        bin.className = 'delete-dump-bin';
+        const bubble = document.createElement('div');
+        bubble.className = 'delete-dump-bubble';
+        bubble.textContent = msg ? msg.slice(0, 32) : 'Message';
+
+        wrap.appendChild(nova);
+        wrap.appendChild(bin);
+        wrap.appendChild(bubble);
+        document.body.appendChild(wrap);
+
+        wrap.addEventListener('animationend', () => {
+          try { wrap.remove(); } catch {}
+        });
+      } catch {
+        // ignore
+      }
+    }
+
     if (newChatBtn) {
       newChatBtn.addEventListener('click', async () => {
         openDialog('New chat', `
@@ -4198,6 +4888,7 @@
             return;
           }
 
+          launchRequestPlane(sendAdd);
           setAddLoading(true);
           try {
             const r = await requestContact(username);
@@ -4960,7 +5651,12 @@
               });
               toast('Profile updated');
               if (meTitleEl) meTitleEl.textContent = r.display_name || newDisplay;
-              if (meSubEl) meSubEl.textContent = (r.about || newAbout) ? (r.about || newAbout) : `@${meUsername}`;
+              if (meSubEl) meSubEl.textContent = `@${meUsername}`;
+              if (meAboutEl) {
+                const aboutText = (r.about || newAbout || '').trim();
+                meAboutEl.textContent = aboutText;
+                meAboutEl.classList.toggle('hidden', !aboutText);
+              }
               closeDialog();
             } catch (e) {
               toast('Profile update failed', e.message || 'Try again');
