@@ -7,6 +7,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <meta name="theme-color" content="#0b1220" />
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
 <body class="bg-animated" data-username="{{ (username or '')|e }}" data-login-url="{{ url_for('login') }}" data-resend-url="{{ url_for('api_email_verify_otp_resend') }}" data-verify-url="{{ url_for('api_email_verify_otp_confirm') }}" data-dev-code="{{ (dev_code or '')|e }}">
   <div class="auth-page">
@@ -54,6 +55,11 @@
   </div>
 
   <script>
+    const themeUser = document.body?.dataset?.username;
+    if (themeUser && window.LinkupTheme?.setUserId) {
+      window.LinkupTheme.setUserId(themeUser);
+    }
+
     const root = document.body;
     const username = (root?.dataset?.username || '').trim();
     const loginUrl = (root?.dataset?.loginUrl || '/login').trim();

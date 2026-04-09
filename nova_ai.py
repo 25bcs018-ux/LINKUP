@@ -1,5 +1,6 @@
 import os
 import importlib
+import inspect
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -28,7 +29,8 @@ def _system_prompt() -> str:
         "Be helpful, concise, and practical. Ask clarifying questions when needed. "
         "Respect user privacy. Do not request passwords, API keys, or other secrets. "
         "If the user asks for illegal or harmful instructions, refuse briefly. "
-        "Prefer short, actionable steps. For troubleshooting, propose checks in order."
+        "Prefer short, actionable steps. For troubleshooting, propose checks in order. "
+        "If you are unsure, say so and suggest where to look in the app or docs."
     )
 
     # LinkUp-specific context so NOVA can answer product/dev questions about this app.
@@ -115,6 +117,14 @@ def _sanitize_reply(text: str) -> str:
     return out
 
 
+def _normalize_reply_text(text: str) -> str:
+    out = (text or "").strip()
+    if not out:
+        return ""
+    out = "\n".join(line.rstrip() for line in out.splitlines()).strip()
+    return out
+
+
 def _normalize_history(history: List[Dict[str, str]]) -> List[Dict[str, str]]:
     max_history = int(os.environ.get("NOVA_MAX_HISTORY", "12") or "12")
     if max_history <= 0:
@@ -137,6 +147,48 @@ def _last_user_turn(history: List[Dict[str, str]]) -> str:
     return ""
 
 
+def _local_command_reply(text: str) -> str | None:
+    low = (text or '').strip().lower()
+    if low in ('/help', 'help', 'commands') or low.startswith('/help '):
+        return (
+            "NOVA quick help:\n"
+            "• /help — show this\n"
+            "• /linkup — LinkUp feature help\n"
+            "• /theme — change background theme\n"
+            "• /avatar — update your avatar\n"
+            "• /support — contact support\n"
+            "• /tour — guided tour"
+        )
+
+    if low in ('/theme', 'theme', 'themes', 'background theme') or low.startswith('/theme '):
+        return (
+            "To change your theme:\n"
+            "1) Open Settings → Edit profile\n"
+            "2) Use Background theme to pick a color + intensity\n"
+            "3) Tap Apply to save\n\n"
+            "Use Reset to go back to the default purple/blue theme."
+        )
+
+    if low in ('/avatar', 'avatar', 'profile photo') or low.startswith('/avatar '):
+        return (
+            "To update your avatar:\n"
+            "1) Settings → Edit profile\n"
+            "2) Upload a photo or use the Sticker avatar builder\n"
+            "3) Tap Use avatar to save"
+        )
+
+    if low in ('/support', 'support', 'help desk') or low.startswith('/support '):
+        return "Open Menu → Support to see FAQs and submit a ticket."
+
+    if low in ('/privacy', 'privacy') or low.startswith('/privacy '):
+        return "Privacy info is in the Privacy Policy page (Menu or website footer)."
+
+    if low in ('/tour', 'tour', 'onboarding') or low.startswith('/tour '):
+        return "Start the tour by typing /tour in Chats or tapping the NOVA tour prompt."
+
+    return None
+
+
 def _local_guided_reply(*, me_username: str, user_text: str, history: List[Dict[str, str]]) -> str:
     text = (user_text or "").strip()
     low = text.lower()
@@ -144,6 +196,10 @@ def _local_guided_reply(*, me_username: str, user_text: str, history: List[Dict[
 
     if not text:
         return "Tell me your goal in one line, and I will give step-by-step help."
+
+    cmd = _local_command_reply(text)
+    if cmd:
+        return cmd
 
     if low in ("hi", "hello", "hey", "yo", "hola"):
         return (
@@ -154,9 +210,9 @@ def _local_guided_reply(*, me_username: str, user_text: str, history: List[Dict[
     if low.startswith("/help") or low == "help":
         return (
             "NOVA quick help:\n"
-            "1. Ask how-to questions: 'how to add a contact'\n"
-            "2. Ask debug questions: 'why is sidebar tap not working'\n"
-            "3. Ask app questions: '/linkup' or '/privacy'"
+            "1) Ask how-to questions: 'how to add a contact'\n"
+            "2) Ask debug questions: 'sidebar tap not working'\n"
+            "3) Ask app questions: '/linkup' or '/privacy'"
         )
 
     followup = low.startswith(("and ", "also ", "what about", "then ", "next "))
@@ -183,8 +239,8 @@ def _local_guided_reply(*, me_username: str, user_text: str, history: List[Dict[
 
     if any(k in low for k in ("nova", "assistant", "ai")):
         return (
-            "NOVA can run in local mode or with providers (OpenAI/Ollama/python/http).\n"
-            "If you want better answers, configure a provider; otherwise ask specific LinkUp questions and I’ll guide you."
+            "NOVA can run locally or with providers (OpenAI/Ollama/python/http).\n"
+            "Ask specific LinkUp questions and I’ll give exact steps."
         )
 
     snippet = _clip(text, 220)
@@ -288,8 +344,26 @@ def _custom_python_reply(*, me_username: str, user_text: str, history: List[Dict
         fn = getattr(mod, func_name, None)
         if not callable(fn):
             return ""
-        out = fn(me_username=me_username, user_text=user_text, history=history)
-        return (out or "").strip()
+
+        kwargs = {
+            "me_username": me_username,
+            "user_text": user_text,
+            "history": history,
+            "system": _system_prompt(),
+            "temperature": float(os.environ.get("NOVA_TEMPERATURE", "0.4") or "0.4"),
+            "max_tokens": int(os.environ.get("NOVA_MAX_TOKENS", "220") or "220"),
+        }
+
+        try:
+            sig = inspect.signature(fn)
+            accepted = {k: v for k, v in kwargs.items() if k in sig.parameters}
+            out = fn(**accepted)
+        except Exception:
+            out = fn(me_username=me_username, user_text=user_text, history=history)
+
+        if isinstance(out, dict):
+            out = out.get("reply") or out.get("content") or ""
+        return _normalize_reply_text(str(out or ""))
     except Exception:
         return ""
 
