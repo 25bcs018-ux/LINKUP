@@ -1,6 +1,8 @@
 # backend code
 from datetime import UTC, datetime, timedelta
+import base64
 import hmac
+import io
 import logging
 import os
 import random
@@ -258,6 +260,8 @@ class User(db.Model):
     about = db.Column(db.String(140), nullable=True)
     avatar_color = db.Column(db.String(16), nullable=True)
     avatar_filename = db.Column(db.String(120), nullable=True)
+    theme_base = db.Column(db.String(16), nullable=True)
+    theme_intensity = db.Column(db.Integer, nullable=True)
     last_seen_at = db.Column(db.DateTime, nullable=True)
 
     def __repr__(self):
@@ -856,6 +860,10 @@ def _ensure_user_profile_columns() -> None:
                 alters.append('ALTER TABLE user ADD COLUMN avatar_color VARCHAR(16)')
             if 'avatar_filename' not in cols:
                 alters.append('ALTER TABLE user ADD COLUMN avatar_filename VARCHAR(120)')
+            if 'theme_base' not in cols:
+                alters.append('ALTER TABLE user ADD COLUMN theme_base VARCHAR(16)')
+            if 'theme_intensity' not in cols:
+                alters.append('ALTER TABLE user ADD COLUMN theme_intensity INTEGER')
 
             for stmt in alters:
                 db.session.execute(text(stmt))
@@ -1420,6 +1428,334 @@ def _allowed_avatar_ext(filename: str) -> str | None:
         if name.endswith(ext):
             return ext
     return None
+
+
+_AVATAR_BUILDER_SKINS = {
+    'light': '#f3cfb1',
+    'medium': '#d6a47a',
+    'deep': '#8b5a3c',
+    'dark': '#5c3b2b',
+}
+
+_AVATAR_BUILDER_HAIR = {
+    'short': '#2f2a28',
+    'long': '#3a2b20',
+    'curly': '#1f1b1a',
+    'bun': '#2b2322',
+    'afro': '#231b1a',
+    'bald': None,
+}
+
+_AVATAR_BUILDER_EYES = ('round', 'almond', 'sleepy', 'wink', 'sparkle')
+_AVATAR_BUILDER_MOUTH = ('smile', 'neutral', 'grin', 'smirk', 'open')
+_AVATAR_BUILDER_ACCESSORY = ('none', 'glasses', 'earring', 'cap', 'hoops')
+
+_AVATAR_BUILDER_BG = {
+    'sunset': '#ffb3c7',
+    'mint': '#9ee6d0',
+    'indigo': '#7aa2ff',
+    'sand': '#f1d3a2',
+    'lilac': '#cbb4ff',
+    'ocean': '#7dd3fc',
+    'forest': '#86efac',
+}
+
+_AVATAR_BUILDER_STYLE = ('classic', 'neon', 'collage', 'pixel', 'comic', 'mix')
+
+_AVATAR_BUILDER_DEFAULTS = {
+    'skin': 'medium',
+    'hair': 'short',
+    'eyes': 'round',
+    'mouth': 'smile',
+    'accessory': 'none',
+    'bg': 'sunset',
+    'style': 'classic',
+}
+
+_THEME_DEFAULT_BASE = '#7c3aed'
+_THEME_DEFAULT_INTENSITY = 70
+
+
+def _is_valid_hex_color(value: str) -> bool:
+    return re.fullmatch(r"#[0-9a-fA-F]{6}", (value or '').strip()) is not None
+
+
+def _normalize_theme_payload(payload: dict) -> tuple[str, int]:
+    base = (payload.get('base') or '').strip()
+    if not _is_valid_hex_color(base):
+        base = _THEME_DEFAULT_BASE
+    try:
+        intensity = int(payload.get('intensity'))
+    except Exception:
+        intensity = _THEME_DEFAULT_INTENSITY
+    intensity = max(0, min(100, intensity))
+    return base, intensity
+
+
+def _theme_payload(me: User) -> dict:
+    base = (getattr(me, 'theme_base', '') or '').strip()
+    if not _is_valid_hex_color(base):
+        base = _THEME_DEFAULT_BASE
+    intensity = getattr(me, 'theme_intensity', None)
+    try:
+        intensity = int(intensity)
+    except Exception:
+        intensity = _THEME_DEFAULT_INTENSITY
+    intensity = max(0, min(100, intensity))
+    return {'base': base, 'intensity': intensity}
+
+
+def _avatar_builder_choice(value: str | None, options, default: str) -> str:
+    raw = (value or '').strip()
+    if isinstance(options, dict):
+        return raw if raw in options else default
+    return raw if raw in options else default
+
+
+def _sanitize_avatar_builder_payload(payload: dict) -> dict:
+    return {
+        'skin': _avatar_builder_choice(payload.get('skin'), _AVATAR_BUILDER_SKINS, _AVATAR_BUILDER_DEFAULTS['skin']),
+        'hair': _avatar_builder_choice(payload.get('hair'), _AVATAR_BUILDER_HAIR, _AVATAR_BUILDER_DEFAULTS['hair']),
+        'eyes': _avatar_builder_choice(payload.get('eyes'), _AVATAR_BUILDER_EYES, _AVATAR_BUILDER_DEFAULTS['eyes']),
+        'mouth': _avatar_builder_choice(payload.get('mouth'), _AVATAR_BUILDER_MOUTH, _AVATAR_BUILDER_DEFAULTS['mouth']),
+        'accessory': _avatar_builder_choice(payload.get('accessory'), _AVATAR_BUILDER_ACCESSORY, _AVATAR_BUILDER_DEFAULTS['accessory']),
+        'bg': _avatar_builder_choice(payload.get('bg'), _AVATAR_BUILDER_BG, _AVATAR_BUILDER_DEFAULTS['bg']),
+        'style': _avatar_builder_choice(payload.get('style'), _AVATAR_BUILDER_STYLE, _AVATAR_BUILDER_DEFAULTS['style']),
+    }
+
+
+def _style_hash(config: dict) -> int:
+    raw = f"{config.get('skin','')}|{config.get('hair','')}|{config.get('eyes','')}|{config.get('mouth','')}|{config.get('accessory','')}|{config.get('bg','')}"
+    acc = 0
+    for ch in raw:
+        acc = (acc * 33 + ord(ch)) % 9973
+    return acc
+
+
+def _render_avatar_builder_base(config: dict, size: int, bg_color: str) -> Image.Image:
+    skin = _AVATAR_BUILDER_SKINS[config['skin']]
+    hair = _AVATAR_BUILDER_HAIR[config['hair']]
+    eyes = config['eyes']
+    mouth = config['mouth']
+    accessory = config['accessory']
+
+    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Background card
+    radius = int(size * 0.22)
+    draw.rounded_rectangle((0, 0, size, size), radius=radius, fill=bg_color)
+
+    cx = size * 0.5
+    cy = size * 0.54
+    r = size * 0.28
+
+    # Face
+    face_box = (cx - r, cy - r, cx + r, cy + r)
+    draw.ellipse(face_box, fill=skin)
+    highlight = (255, 255, 255, 45)
+    draw.ellipse((cx - r * 0.9, cy - r * 0.95, cx + r * 0.15, cy - r * 0.1), fill=highlight)
+
+    # Hair
+    if hair:
+        hair_color = hair
+        if config['hair'] == 'short':
+            hair_box = (cx - r, cy - r * 1.05, cx + r, cy + r * 0.05)
+            draw.ellipse(hair_box, fill=hair_color)
+        elif config['hair'] == 'long':
+            hair_box = (cx - r * 1.05, cy - r * 1.1, cx + r * 1.05, cy + r * 0.35)
+            draw.ellipse(hair_box, fill=hair_color)
+            draw.rounded_rectangle((cx - r * 1.05, cy - r * 0.1, cx - r * 0.2, cy + r * 1.05), radius=int(r * 0.4), fill=hair_color)
+            draw.rounded_rectangle((cx + r * 0.2, cy - r * 0.1, cx + r * 1.05, cy + r * 1.05), radius=int(r * 0.4), fill=hair_color)
+        elif config['hair'] == 'curly':
+            curl_r = r * 0.28
+            for i in range(-2, 3):
+                x = cx + (i * curl_r * 0.9)
+                y = cy - r * 1.05
+                draw.ellipse((x - curl_r, y - curl_r, x + curl_r, y + curl_r), fill=hair_color)
+            draw.ellipse((cx - r * 1.05, cy - r * 0.9, cx + r * 1.05, cy + r * 0.1), fill=hair_color)
+        elif config['hair'] == 'bun':
+            draw.ellipse((cx - r, cy - r * 1.0, cx + r, cy + r * 0.05), fill=hair_color)
+            bun_r = r * 0.35
+            draw.ellipse((cx - bun_r, cy - r * 1.25 - bun_r, cx + bun_r, cy - r * 1.25 + bun_r), fill=hair_color)
+        elif config['hair'] == 'afro':
+            afro_r = r * 0.7
+            draw.ellipse((cx - afro_r, cy - r * 1.3, cx + afro_r, cy - r * 0.1), fill=hair_color)
+
+    # Eyes
+    eye_y = cy - r * 0.18
+    eye_dx = r * 0.45
+    eye_r = r * 0.1
+    pupil_r = eye_r * 0.45
+    eye_color = (30, 30, 30, 255)
+    for side in (-1, 1):
+        ex = cx + eye_dx * side
+        if eyes == 'round':
+            draw.ellipse((ex - eye_r, eye_y - eye_r, ex + eye_r, eye_y + eye_r), fill=(255, 255, 255, 230))
+            draw.ellipse((ex - pupil_r, eye_y - pupil_r, ex + pupil_r, eye_y + pupil_r), fill=eye_color)
+        elif eyes == 'almond':
+            draw.ellipse((ex - eye_r * 1.1, eye_y - eye_r * 0.8, ex + eye_r * 1.1, eye_y + eye_r * 0.8), fill=(255, 255, 255, 230))
+            draw.ellipse((ex - pupil_r, eye_y - pupil_r, ex + pupil_r, eye_y + pupil_r), fill=eye_color)
+        elif eyes == 'sleepy':
+            draw.line((ex - eye_r, eye_y, ex + eye_r, eye_y), fill=eye_color, width=int(r * 0.06))
+        elif eyes == 'wink':
+            if side == -1:
+                draw.line((ex - eye_r, eye_y, ex + eye_r, eye_y), fill=eye_color, width=int(r * 0.06))
+            else:
+                draw.ellipse((ex - eye_r, eye_y - eye_r, ex + eye_r, eye_y + eye_r), fill=(255, 255, 255, 230))
+                draw.ellipse((ex - pupil_r, eye_y - pupil_r, ex + pupil_r, eye_y + pupil_r), fill=eye_color)
+        elif eyes == 'sparkle':
+            draw.ellipse((ex - eye_r, eye_y - eye_r, ex + eye_r, eye_y + eye_r), fill=(255, 255, 255, 235))
+            draw.ellipse((ex - pupil_r, eye_y - pupil_r, ex + pupil_r, eye_y + pupil_r), fill=eye_color)
+            draw.ellipse((ex + pupil_r * 0.2, eye_y - pupil_r * 0.4, ex + pupil_r * 0.6, eye_y - pupil_r * 0.05), fill=(255, 255, 255, 220))
+
+    # Mouth
+    mouth_y = cy + r * 0.28
+    mouth_w = r * 0.6
+    mouth_color = (80, 40, 40, 220)
+    if mouth == 'smile':
+        draw.arc((cx - mouth_w, mouth_y - r * 0.2, cx + mouth_w, mouth_y + r * 0.5), start=10, end=170, fill=mouth_color, width=int(r * 0.08))
+    elif mouth == 'neutral':
+        draw.line((cx - mouth_w * 0.5, mouth_y, cx + mouth_w * 0.5, mouth_y), fill=mouth_color, width=int(r * 0.08))
+    elif mouth == 'grin':
+        draw.arc((cx - mouth_w, mouth_y - r * 0.25, cx + mouth_w, mouth_y + r * 0.55), start=10, end=170, fill=mouth_color, width=int(r * 0.1))
+        draw.line((cx - mouth_w * 0.35, mouth_y + r * 0.12, cx + mouth_w * 0.35, mouth_y + r * 0.12), fill=(255, 255, 255, 200), width=int(r * 0.05))
+    elif mouth == 'smirk':
+        draw.arc((cx - mouth_w * 0.8, mouth_y - r * 0.1, cx + mouth_w * 0.2, mouth_y + r * 0.4), start=20, end=170, fill=mouth_color, width=int(r * 0.08))
+    elif mouth == 'open':
+        draw.ellipse((cx - mouth_w * 0.3, mouth_y - r * 0.02, cx + mouth_w * 0.3, mouth_y + r * 0.28), fill=mouth_color)
+        draw.ellipse((cx - mouth_w * 0.22, mouth_y + r * 0.05, cx + mouth_w * 0.22, mouth_y + r * 0.2), fill=(180, 70, 80, 200))
+
+    # Accessories
+    if accessory == 'glasses':
+        lens_w = r * 0.5
+        lens_h = r * 0.35
+        for side in (-1, 1):
+            ex = cx + eye_dx * side
+            draw.rounded_rectangle((ex - lens_w * 0.5, eye_y - lens_h * 0.5, ex + lens_w * 0.5, eye_y + lens_h * 0.5), radius=int(r * 0.12), outline=(20, 20, 20, 200), width=int(r * 0.05))
+        draw.line((cx - lens_w * 0.1, eye_y, cx + lens_w * 0.1, eye_y), fill=(20, 20, 20, 200), width=int(r * 0.05))
+    elif accessory == 'earring':
+        draw.ellipse((cx - r * 0.95, cy + r * 0.1, cx - r * 0.8, cy + r * 0.25), outline=(255, 255, 255, 220), width=int(r * 0.05))
+    elif accessory == 'cap':
+        cap_w = r * 1.3
+        cap_h = r * 0.45
+        draw.rounded_rectangle((cx - cap_w * 0.5, cy - r * 1.05, cx + cap_w * 0.5, cy - r * 0.55), radius=int(r * 0.2), fill=(35, 35, 45, 220))
+        draw.rounded_rectangle((cx - cap_w * 0.35, cy - r * 0.55, cx + cap_w * 0.35, cy - r * 0.45), radius=int(r * 0.15), fill=(25, 25, 30, 200))
+    elif accessory == 'hoops':
+        hoop_r = r * 0.2
+        draw.ellipse((cx - r * 0.95 - hoop_r, cy + r * 0.05, cx - r * 0.95 + hoop_r, cy + r * 0.45), outline=(255, 220, 180, 230), width=int(r * 0.06))
+        draw.ellipse((cx + r * 0.95 - hoop_r, cy + r * 0.05, cx + r * 0.95 + hoop_r, cy + r * 0.45), outline=(255, 220, 180, 230), width=int(r * 0.06))
+
+    return img
+
+
+def _draw_neon_overlay(img: Image.Image, config: dict) -> None:
+    draw = ImageDraw.Draw(img)
+    size = img.size[0]
+    glow = (50, 255, 245, 160)
+    glow2 = (255, 50, 190, 150)
+    draw.rounded_rectangle((10, 10, size - 10, size - 10), radius=int(size * 0.2), outline=glow, width=4)
+    draw.rounded_rectangle((22, 22, size - 22, size - 22), radius=int(size * 0.18), outline=glow2, width=3)
+    for i in range(6):
+        offset = 20 + (i * 12)
+        draw.arc((offset, offset, size - offset, size - offset), start=240, end=320, fill=glow, width=2)
+
+
+def _draw_collage_overlay(img: Image.Image, config: dict) -> None:
+    draw = ImageDraw.Draw(img)
+    size = img.size[0]
+    paper1 = (255, 255, 255, 70)
+    paper2 = (250, 230, 200, 70)
+    tape = (255, 245, 220, 120)
+    draw.rounded_rectangle((size * 0.08, size * 0.08, size * 0.45, size * 0.22), radius=14, fill=paper1)
+    draw.rounded_rectangle((size * 0.55, size * 0.12, size * 0.92, size * 0.28), radius=14, fill=paper2)
+    draw.rectangle((size * 0.12, size * 0.26, size * 0.22, size * 0.32), fill=tape)
+    draw.rectangle((size * 0.78, size * 0.3, size * 0.88, size * 0.36), fill=tape)
+    for i in range(6):
+        x0 = size * 0.12 + i * size * 0.12
+        y0 = size * 0.84
+        draw.line((x0, y0, x0 + size * 0.06, y0 + size * 0.04), fill=(255, 255, 255, 90), width=2)
+
+
+def _draw_comic_overlay(img: Image.Image, config: dict) -> None:
+    draw = ImageDraw.Draw(img)
+    size = img.size[0]
+    dot = (0, 0, 0, 22)
+    step = max(8, size // 24)
+    for y in range(0, size, step):
+        for x in range(0, size, step):
+            draw.ellipse((x, y, x + 3, y + 3), fill=dot)
+    draw.rounded_rectangle((6, 6, size - 6, size - 6), radius=int(size * 0.2), outline=(0, 0, 0, 130), width=3)
+
+
+def _render_avatar_builder_image(config: dict, size: int = 512) -> Image.Image:
+    bg = _AVATAR_BUILDER_BG[config['bg']]
+    style = config.get('style') or 'classic'
+
+    if style == 'pixel':
+        small = max(72, size // 4)
+        base = _render_avatar_builder_base(config, small, bg)
+        img = base.resize((size, size), Image.NEAREST)
+        draw = ImageDraw.Draw(img)
+        grid = max(12, size // 24)
+        for i in range(0, size, grid):
+            draw.line((i, 0, i, size), fill=(0, 0, 0, 28), width=1)
+            draw.line((0, i, size, i), fill=(0, 0, 0, 28), width=1)
+        return img
+
+    if style == 'neon':
+        bg = '#0b0f1a'
+    elif style == 'comic':
+        bg = '#f7f3ea'
+    elif style == 'collage':
+        bg = '#f4efe5'
+
+    img = _render_avatar_builder_base(config, size, bg)
+
+    if style == 'neon':
+        _draw_neon_overlay(img, config)
+    elif style == 'collage':
+        _draw_collage_overlay(img, config)
+    elif style == 'comic':
+        _draw_comic_overlay(img, config)
+    elif style == 'mix':
+        picker = _style_hash(config) % 4
+        if picker == 0:
+            _draw_neon_overlay(img, config)
+        elif picker == 1:
+            _draw_collage_overlay(img, config)
+        elif picker == 2:
+            _draw_comic_overlay(img, config)
+        else:
+            img = _render_avatar_builder_image({**config, 'style': 'pixel'}, size)
+    return img
+
+
+def _avatar_builder_data_url(img: Image.Image) -> str:
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    data = base64.b64encode(buf.getvalue()).decode('ascii')
+    return f"data:image/png;base64,{data}"
+
+
+def _save_avatar_builder_image(me: User, img: Image.Image) -> str:
+    _avatars_dir().mkdir(parents=True, exist_ok=True)
+
+    if me.avatar_filename:
+        try:
+            (_avatars_dir() / me.avatar_filename).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    stamp = int(_utcnow().timestamp())
+    base = secure_filename(me.username) or f"user{me.id}"
+    filename = f"{base}_{me.id}_{stamp}_builder.png"
+    path = _avatars_dir() / filename
+    img.save(path, format='PNG')
+
+    me.avatar_filename = filename
+    db.session.commit()
+    return _avatar_url(me) + f"?v={stamp}"
 
 
 def _allowed_group_image_ext(filename: str) -> str | None:
@@ -2109,6 +2445,8 @@ def register():
             email=email,
             email_verified=False,
             display_name=username,
+            theme_base=_THEME_DEFAULT_BASE,
+            theme_intensity=_THEME_DEFAULT_INTENSITY,
         )
 
         db.session.add(new_user)
@@ -3450,6 +3788,7 @@ def api_account_profile():
             'about': me.about or '',
             'avatar_color': me.avatar_color or '',
             'avatar_url': _avatar_url(me),
+            'theme': _theme_payload(me),
         })
 
     payload = request.get_json(silent=True) or {}
@@ -3466,6 +3805,23 @@ def api_account_profile():
     db.session.commit()
 
     return jsonify({'ok': True, 'display_name': me.display_name, 'about': me.about or ''})
+
+
+@app.route('/api/account/theme', methods=['GET', 'POST'])
+def api_account_theme():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    if request.method == 'GET':
+        return jsonify(_theme_payload(me))
+
+    payload = request.get_json(silent=True) or {}
+    base, intensity = _normalize_theme_payload(payload)
+    me.theme_base = base
+    me.theme_intensity = intensity
+    db.session.commit()
+    return jsonify({'ok': True, 'base': base, 'intensity': intensity})
 
 
 @app.route('/api/account/avatar', methods=['POST'])
@@ -3529,6 +3885,31 @@ def api_account_avatar_delete():
         db.session.commit()
 
     return jsonify({'ok': True})
+
+
+@app.route('/api/account/avatar/builder/preview', methods=['POST'])
+def api_account_avatar_builder_preview():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    config = _sanitize_avatar_builder_payload(payload)
+    img = _render_avatar_builder_image(config)
+    return jsonify({'ok': True, 'data_url': _avatar_builder_data_url(img), 'config': config})
+
+
+@app.route('/api/account/avatar/builder/save', methods=['POST'])
+def api_account_avatar_builder_save():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    config = _sanitize_avatar_builder_payload(payload)
+    img = _render_avatar_builder_image(config)
+    avatar_url = _save_avatar_builder_image(me, img)
+    return jsonify({'ok': True, 'avatar_url': avatar_url, 'config': config})
 
 
 @app.route('/api/account/email', methods=['POST'])

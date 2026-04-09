@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme-user="{{ username|e }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,8 +14,9 @@
 
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
+  <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body class="bg-animated">
+<body class="bg-animated" data-theme-user="{{ username|e }}">
   <header>
     <div class="wrap nav">
       <a class="brand" href="{{ url_for('front') }}" aria-label="LinkUp home">
@@ -112,6 +113,26 @@
       </section>
     </div>
   </main>
+
+  <script>
+    const themeUser = document.body?.dataset?.themeUser;
+    if (themeUser && window.LinkupTheme?.setUserId) {
+      window.LinkupTheme.setUserId(themeUser);
+    }
+    (async () => {
+      if (!window.LinkupTheme || !themeUser) return;
+      try {
+        const res = await fetch('/api/account/theme');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        if (!data || typeof data !== 'object') return;
+        window.LinkupTheme.saveTheme(data);
+        window.LinkupTheme.applyTheme(data);
+      } catch {
+        // ignore theme sync failures
+      }
+    })();
+  </script>
   <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
 </body>
 </html>

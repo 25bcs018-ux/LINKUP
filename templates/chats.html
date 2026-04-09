@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme-user="{{ me.id }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,6 +14,7 @@
   <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='chats.css') }}" />
+  <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
 <body class="bg-animated">
   <div class="app">
@@ -363,6 +364,26 @@
     const shell = document.getElementById('shell');
     const meUsername = (shell.dataset.meUsername || '').trim();
     const meId = (shell.dataset.meId || '').trim();
+    const themeUserKey = meId || meUsername;
+    if (themeUserKey && window.LinkupTheme?.setUserId) {
+      window.LinkupTheme.setUserId(themeUserKey);
+    }
+
+    async function hydrateThemeFromServer() {
+      if (!window.LinkupTheme) return;
+      try {
+        const res = await fetch('/api/account/theme');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        if (!data || typeof data !== 'object') return;
+        window.LinkupTheme.saveTheme(data);
+        window.LinkupTheme.applyTheme(data);
+      } catch {
+        // ignore theme sync failures
+      }
+    }
+
+    hydrateThemeFromServer();
     const activeUsernameRaw = (shell.dataset.activeUsername || '').trim();
     const activeUsername = activeUsernameRaw ? activeUsernameRaw : null;
 
@@ -461,11 +482,32 @@
     const novaHero = document.getElementById('novaHero');
     const novaComposer = document.getElementById('novaComposer');
     const novaInput = document.getElementById('novaInput');
+    const novaTyping = document.getElementById('novaTyping');
 
     let novaOpen = false;
     let novaLastHash = '';
     let novaFirstLoad = true;
     let novaPoll = null;
+    let novaPollDelay = 1100;
+
+    function setNovaTyping(isTyping) {
+      if (!novaTyping) return;
+      novaTyping.classList.toggle('hidden', !isTyping);
+    }
+
+    function scheduleNovaPoll() {
+      if (!novaOpen) return;
+      if (novaPoll) clearTimeout(novaPoll);
+      novaPoll = setTimeout(async () => {
+        const changed = await refreshNovaMessages();
+        if (changed) {
+          novaPollDelay = 1100;
+        } else {
+          novaPollDelay = Math.min(3200, novaPollDelay + 350);
+        }
+        scheduleNovaPoll();
+      }, novaPollDelay);
+    }
 
     function setNovaOpen(open) {
       novaOpen = !!open;
@@ -478,12 +520,11 @@
       if (novaOpen) {
         try { novaInput?.focus(); } catch {}
         refreshNovaMessages();
-        if (!novaPoll) novaPoll = setInterval(refreshNovaMessages, 1400);
+        scheduleNovaPoll();
       } else {
-        if (novaPoll) {
-          clearInterval(novaPoll);
-          novaPoll = null;
-        }
+        if (novaPoll) clearTimeout(novaPoll);
+        novaPoll = null;
+        setNovaTyping(false);
       }
     }
 
@@ -509,6 +550,9 @@
       }
       if (novaHero) novaHero.classList.toggle('hidden', rows.length > 0);
       novaMessages.innerHTML = rows.length ? rows.join('') : '<div class="nova-hint">Say hi to NOVA.</div>';
+      const lastMsg = data.length ? data[data.length - 1] : null;
+      const lastFromNova = lastMsg && (String(lastMsg.sender_username || '').toLowerCase() === 'nova');
+      if (lastFromNova) setNovaTyping(false);
       // Scroll to bottom
       try {
         const body = document.getElementById('novaBody');
@@ -689,6 +733,7 @@
           const d = await res.json().catch(() => ({}));
           const err = d.error || 'NOVA unavailable';
           novaMessages.innerHTML = `<div class="nova-hint">${escapeHtml(err)}</div>`;
+          setNovaTyping(false);
           return;
         }
         const data = normalizeTransportMessages(await res.json());
@@ -701,6 +746,7 @@
         return changed;
       } catch {
         novaMessages.innerHTML = '<div class="nova-hint">Network error</div>';
+        setNovaTyping(false);
         return false;
       }
     }
@@ -727,6 +773,35 @@
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Failed');
+      }
+    }
+
+    async function submitNova(text) {
+      const submitted = (text || '').trim();
+      if (!submitted) return;
+      const sendBtn = novaComposer?.querySelector?.('.nova-send');
+      const beforeHash = novaLastHash;
+
+      const triggerTour = shouldTriggerNovaTour(submitted);
+      if (triggerTour) {
+        toast('NOVA', 'Starting the tour…');
+        try { startOnboardingTour(); } catch {}
+      }
+
+      try {
+        setNovaTyping(true);
+        if (sendBtn) sendBtn.disabled = true;
+        if (novaInput) novaInput.value = '';
+        await sendNovaMessage(submitted);
+        const changed = await refreshNovaMessages();
+        if (!changed) {
+          await waitForNovaReply(beforeHash);
+        }
+      } catch (e) {
+        setNovaTyping(false);
+        toast('NOVA failed', e.message || 'Try again');
+      } finally {
+        if (sendBtn) sendBtn.disabled = false;
       }
     }
 
@@ -757,30 +832,15 @@
 
     novaComposer?.addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      const submitted = (novaInput?.value || '').trim();
-      if (!submitted) return;
-      const sendBtn = novaComposer?.querySelector?.('.nova-send');
-      const beforeHash = novaLastHash;
+      await submitNova(novaInput?.value || '');
+    });
 
-      const triggerTour = shouldTriggerNovaTour(submitted);
-      if (triggerTour) {
-        toast('NOVA', 'Starting the tour…');
-        try { startOnboardingTour(); } catch {}
-      }
-
-      try {
-        if (sendBtn) sendBtn.disabled = true;
-        novaInput.value = '';
-        await sendNovaMessage(submitted);
-        const changed = await refreshNovaMessages();
-        if (!changed) {
-          await waitForNovaReply(beforeHash);
-        }
-      } catch (e) {
-        toast('NOVA failed', e.message || 'Try again');
-      } finally {
-        if (sendBtn) sendBtn.disabled = false;
-      }
+    document.querySelectorAll('[data-nova-chip]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const v = btn.getAttribute('data-nova-chip') || '';
+        if (!v) return;
+        await submitNova(v);
+      });
     });
 
     // ------------------ Per-chat Wallpaper ------------------
@@ -5749,6 +5809,7 @@
           const about = (data.about || '').trim();
 
           const avatarUrl = (data.avatar_url || '').trim();
+          const serverTheme = (data.theme && typeof data.theme === 'object') ? data.theme : null;
 
           openDialog('Edit profile', `
             <div class="dlg-card">
@@ -5760,6 +5821,120 @@
                   <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
                     <button class="btn primary" type="button" id="uploadAvatar">Upload</button>
                     <button class="btn danger" type="button" id="removeAvatar">Remove</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dlg-card">
+              <div class="dlg-sec">Sticker avatar builder</div>
+              <div class="avatar-builder">
+                <div class="avatar preview avatar-builder-preview" id="builderPreview"></div>
+                <div class="avatar-builder-controls">
+                  <div class="avatar-builder-grid">
+                    <div class="builder-field">
+                      <label class="builder-label" for="builderStyle">Style</label>
+                      <select class="dlg-input" id="builderStyle">
+                        <option value="classic" selected>Classic</option>
+                        <option value="neon">Neon cyber</option>
+                        <option value="collage">Collage</option>
+                        <option value="pixel">Arcade pixel</option>
+                        <option value="comic">Comic ink</option>
+                        <option value="mix">Surprise mix</option>
+                      </select>
+                    </div>
+                    <div class="builder-field">
+                      <label class="builder-label" for="builderSkin">Skin</label>
+                      <select class="dlg-input" id="builderSkin">
+                        <option value="light">Light</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="deep">Deep</option>
+                        <option value="dark">Dark</option>
+                      </select>
+                    </div>
+                    <div class="builder-field">
+                      <label class="builder-label" for="builderHair">Hair</label>
+                      <select class="dlg-input" id="builderHair">
+                        <option value="short" selected>Short</option>
+                        <option value="long">Long</option>
+                        <option value="curly">Curly</option>
+                        <option value="bun">Bun</option>
+                        <option value="afro">Afro</option>
+                        <option value="bald">Bald</option>
+                      </select>
+                    </div>
+                    <div class="builder-field">
+                      <label class="builder-label" for="builderEyes">Eyes</label>
+                      <select class="dlg-input" id="builderEyes">
+                        <option value="round" selected>Round</option>
+                        <option value="almond">Almond</option>
+                        <option value="sleepy">Sleepy</option>
+                        <option value="wink">Wink</option>
+                        <option value="sparkle">Sparkle</option>
+                      </select>
+                    </div>
+                    <div class="builder-field">
+                      <label class="builder-label" for="builderMouth">Mouth</label>
+                      <select class="dlg-input" id="builderMouth">
+                        <option value="smile" selected>Smile</option>
+                        <option value="neutral">Neutral</option>
+                        <option value="grin">Grin</option>
+                        <option value="smirk">Smirk</option>
+                        <option value="open">Open</option>
+                      </select>
+                    </div>
+                    <div class="builder-field">
+                      <label class="builder-label" for="builderAccessory">Accessory</label>
+                      <select class="dlg-input" id="builderAccessory">
+                        <option value="none" selected>None</option>
+                        <option value="glasses">Glasses</option>
+                        <option value="earring">Earring</option>
+                        <option value="cap">Cap</option>
+                        <option value="hoops">Hoops</option>
+                      </select>
+                    </div>
+                    <div class="builder-field">
+                      <label class="builder-label" for="builderBg">Background</label>
+                      <select class="dlg-input" id="builderBg">
+                        <option value="sunset" selected>Sunset</option>
+                        <option value="mint">Mint</option>
+                        <option value="indigo">Indigo</option>
+                        <option value="sand">Sand</option>
+                        <option value="lilac">Lilac</option>
+                        <option value="ocean">Ocean</option>
+                        <option value="forest">Forest</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="avatar-builder-actions">
+                    <span class="builder-status" id="builderStatus">Ready</span>
+                    <div class="builder-buttons">
+                      <button class="btn" type="button" id="builderRandom">Random</button>
+                      <button class="btn" type="button" id="builderPreviewBtn">Preview</button>
+                      <button class="btn primary" type="button" id="builderSave">Use avatar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dlg-card">
+              <div class="dlg-sec">Background theme</div>
+              <div class="theme-dial">
+                <div class="theme-preview" id="themePreview"></div>
+                <div class="theme-controls">
+                  <label class="builder-label" for="themeColor">Base color</label>
+                  <input class="dlg-input theme-color" id="themeColor" type="color" value="#7c3aed" />
+
+                  <label class="builder-label" for="themeIntensity">Gradient intensity</label>
+                  <input class="theme-range" id="themeIntensity" type="range" min="0" max="100" value="70" />
+
+                  <div class="theme-actions">
+                    <span class="builder-status" id="themeStatus">Applies everywhere</span>
+                    <div class="builder-buttons">
+                      <button class="btn" type="button" id="themeApply">Apply</button>
+                      <button class="btn" type="button" id="themeReset">Reset</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -5801,6 +5976,21 @@
 
           const avatarPreview = document.getElementById('avatarPreview');
           const avatarFile = document.getElementById('avatarFile');
+          const builderPreview = document.getElementById('builderPreview');
+          const builderStatus = document.getElementById('builderStatus');
+          const builderStyle = document.getElementById('builderStyle');
+          const builderSkin = document.getElementById('builderSkin');
+          const builderHair = document.getElementById('builderHair');
+          const builderEyes = document.getElementById('builderEyes');
+          const builderMouth = document.getElementById('builderMouth');
+          const builderAccessory = document.getElementById('builderAccessory');
+          const builderBg = document.getElementById('builderBg');
+          const themePreview = document.getElementById('themePreview');
+          const themeColor = document.getElementById('themeColor');
+          const themeIntensity = document.getElementById('themeIntensity');
+          const themeStatus = document.getElementById('themeStatus');
+          const themeApply = document.getElementById('themeApply');
+          const themeReset = document.getElementById('themeReset');
           document.getElementById('uploadAvatar')?.addEventListener('click', async () => {
             const f = avatarFile?.files?.[0];
             if (!f) return toast('Pick a photo', 'Choose a file first');
@@ -5829,6 +6019,175 @@
               toast('Remove failed', e.message || 'Try again');
             }
           });
+
+          const AVATAR_BUILDER_STORAGE_KEY = 'linkup_avatar_builder_v1';
+
+          function avatarBuilderPayload() {
+            return {
+              style: builderStyle?.value || 'classic',
+              skin: builderSkin?.value || 'medium',
+              hair: builderHair?.value || 'short',
+              eyes: builderEyes?.value || 'round',
+              mouth: builderMouth?.value || 'smile',
+              accessory: builderAccessory?.value || 'none',
+              bg: builderBg?.value || 'sunset',
+            };
+          }
+
+          function saveBuilderConfig(cfg) {
+            try {
+              localStorage.setItem(AVATAR_BUILDER_STORAGE_KEY, JSON.stringify(cfg || {}));
+            } catch {
+              // ignore storage errors
+            }
+          }
+
+          function loadBuilderConfig() {
+            try {
+              const raw = localStorage.getItem(AVATAR_BUILDER_STORAGE_KEY);
+              return raw ? JSON.parse(raw) : null;
+            } catch {
+              return null;
+            }
+          }
+
+          function applyBuilderConfig(cfg) {
+            if (!cfg || typeof cfg !== 'object') return;
+            if (builderStyle && cfg.style) builderStyle.value = cfg.style;
+            if (builderSkin && cfg.skin) builderSkin.value = cfg.skin;
+            if (builderHair && cfg.hair) builderHair.value = cfg.hair;
+            if (builderEyes && cfg.eyes) builderEyes.value = cfg.eyes;
+            if (builderMouth && cfg.mouth) builderMouth.value = cfg.mouth;
+            if (builderAccessory && cfg.accessory) builderAccessory.value = cfg.accessory;
+            if (builderBg && cfg.bg) builderBg.value = cfg.bg;
+          }
+
+          function setBuilderStatus(text) {
+            if (builderStatus) builderStatus.textContent = text || '';
+          }
+
+          async function runBuilderPreview() {
+            if (!builderPreview) return;
+            setBuilderStatus('Rendering...');
+            try {
+              const r = await apiJson('/api/account/avatar/builder/preview', avatarBuilderPayload());
+              const url = (r.data_url || '').trim();
+              setAvatarBg(builderPreview, url);
+              saveBuilderConfig(r.config || avatarBuilderPayload());
+              setBuilderStatus(url ? 'Preview ready' : 'Ready');
+            } catch (e) {
+              setBuilderStatus('Preview failed');
+              toast('Avatar preview failed', e.message || 'Try again');
+            }
+          }
+
+          function randomChoice(items) {
+            if (!Array.isArray(items) || !items.length) return '';
+            return items[Math.floor(Math.random() * items.length)];
+          }
+
+          const builderOptions = {
+            style: ['classic', 'neon', 'collage', 'pixel', 'comic', 'mix'],
+            skin: ['light', 'medium', 'deep', 'dark'],
+            hair: ['short', 'long', 'curly', 'bun', 'afro', 'bald'],
+            eyes: ['round', 'almond', 'sleepy', 'wink', 'sparkle'],
+            mouth: ['smile', 'neutral', 'grin', 'smirk', 'open'],
+            accessory: ['none', 'glasses', 'earring', 'cap', 'hoops'],
+            bg: ['sunset', 'mint', 'indigo', 'sand', 'lilac', 'ocean', 'forest'],
+          };
+
+          document.getElementById('builderPreviewBtn')?.addEventListener('click', runBuilderPreview);
+          document.getElementById('builderRandom')?.addEventListener('click', () => {
+            if (builderStyle) builderStyle.value = randomChoice(builderOptions.style) || builderStyle.value;
+            if (builderSkin) builderSkin.value = randomChoice(builderOptions.skin) || builderSkin.value;
+            if (builderHair) builderHair.value = randomChoice(builderOptions.hair) || builderHair.value;
+            if (builderEyes) builderEyes.value = randomChoice(builderOptions.eyes) || builderEyes.value;
+            if (builderMouth) builderMouth.value = randomChoice(builderOptions.mouth) || builderMouth.value;
+            if (builderAccessory) builderAccessory.value = randomChoice(builderOptions.accessory) || builderAccessory.value;
+            if (builderBg) builderBg.value = randomChoice(builderOptions.bg) || builderBg.value;
+            runBuilderPreview();
+          });
+
+          document.getElementById('builderSave')?.addEventListener('click', async () => {
+            if (!builderPreview) return;
+            setBuilderStatus('Saving...');
+            try {
+              const r = await apiJson('/api/account/avatar/builder/save', avatarBuilderPayload());
+              const u = (r.avatar_url || '').trim();
+              if (u) {
+                setAvatarBg(builderPreview, u);
+                setAvatarBg(avatarPreview, u);
+                setAvatarBg(meAvatarEl, u);
+              }
+              saveBuilderConfig(r.config || avatarBuilderPayload());
+              setBuilderStatus('Saved');
+              toast('Avatar updated');
+            } catch (e) {
+              setBuilderStatus('Save failed');
+              toast('Avatar update failed', e.message || 'Try again');
+            }
+          });
+
+          function readThemeInputs() {
+            return {
+              base: (themeColor?.value || '#7c3aed').trim() || '#7c3aed',
+              intensity: Math.max(0, Math.min(100, Number(themeIntensity?.value) || 70)),
+            };
+          }
+
+          function renderThemePreview(theme) {
+            if (!themePreview) return;
+            if (!window.LinkupTheme || typeof window.LinkupTheme.computeTheme !== 'function') return;
+            const resolved = window.LinkupTheme.computeTheme(theme.base, theme.intensity);
+            themePreview.style.background = `
+              radial-gradient(160px 120px at 20% 20%, ${resolved.glow1}, transparent 60%),
+              radial-gradient(140px 120px at 80% 20%, ${resolved.glow2}, transparent 60%),
+              radial-gradient(180px 160px at 50% 85%, ${resolved.glow3}, transparent 60%),
+              linear-gradient(180deg, ${resolved.bg1}, ${resolved.bg0})
+            `;
+            if (themeStatus) themeStatus.textContent = `Intensity ${theme.intensity}%`;
+          }
+
+          const initialTheme = serverTheme || window.LinkupTheme?.loadTheme?.() || { base: '#7c3aed', intensity: 70 };
+          if (themeColor && initialTheme.base) themeColor.value = initialTheme.base;
+          if (themeIntensity) themeIntensity.value = String(initialTheme.intensity ?? 70);
+          renderThemePreview(readThemeInputs());
+
+          themeColor?.addEventListener('input', () => renderThemePreview(readThemeInputs()));
+          themeIntensity?.addEventListener('input', () => renderThemePreview(readThemeInputs()));
+
+          themeApply?.addEventListener('click', async () => {
+            if (!window.LinkupTheme) return;
+            const next = readThemeInputs();
+            try {
+              await apiJson('/api/account/theme', next);
+              window.LinkupTheme.saveTheme(next);
+              window.LinkupTheme.applyTheme(next);
+              renderThemePreview(next);
+              toast('Theme updated');
+            } catch (e) {
+              toast('Theme update failed', e.message || 'Try again');
+            }
+          });
+
+          themeReset?.addEventListener('click', async () => {
+            if (!window.LinkupTheme) return;
+            const reset = window.LinkupTheme.DEFAULT_THEME || { base: '#7c3aed', intensity: 70 };
+            try {
+              await apiJson('/api/account/theme', reset);
+              window.LinkupTheme.applyTheme(reset);
+              window.LinkupTheme.saveTheme(reset);
+              if (themeColor) themeColor.value = reset.base;
+              if (themeIntensity) themeIntensity.value = String(reset.intensity ?? 70);
+              renderThemePreview(reset);
+              toast('Theme reset');
+            } catch (e) {
+              toast('Theme reset failed', e.message || 'Try again');
+            }
+          });
+
+          applyBuilderConfig(loadBuilderConfig());
+          runBuilderPreview();
 
           document.getElementById('saveProfile')?.addEventListener('click', async () => {
             const newDisplay = (document.getElementById('dispName')?.value || '').trim();
