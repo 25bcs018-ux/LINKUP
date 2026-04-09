@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <title>LinkUp Creator Studio</title>
+  <link rel="stylesheet" href="/creator/creator.css" />
+</head>
+<body>
+  <div class="aurora"></div>
+  <div class="grid-noise"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg class="brand-logo" viewBox="0 0 64 64" role="img" aria-hidden="true">
+          <defs>
+            <linearGradient id="studioGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="currentColor" stop-opacity="0.95" />
+              <stop offset="100%" stop-color="currentColor" stop-opacity="0.6" />
+            </linearGradient>
+          </defs>
+          <rect x="6" y="6" width="52" height="52" rx="14" fill="none" stroke="currentColor" stroke-width="3" opacity="0.55" />
+          <path d="M20 34c0 6 4.8 10 12 10s12-4 12-10" fill="none" stroke="url(#studioGlow)" stroke-width="4" stroke-linecap="round" />
+          <path d="M24 26c2-4.8 6.2-7.2 12-7.2s10 2.4 12 7.2" fill="none" stroke="url(#studioGlow)" stroke-width="4" stroke-linecap="round" />
+          <circle cx="22" cy="32" r="5" fill="currentColor" opacity="0.9" />
+          <circle cx="42" cy="32" r="5" fill="currentColor" opacity="0.9" />
+          <path d="M30 32h4" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.8" />
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">LinkUp Creator</div>
+        <div class="brand-sub">Studio deck</div>
+      </div>
+    </div>
+    <nav class="top-actions">
+      <a class="ghost nav-link decorated" id="navLibraryBtn" href="#libraryModal">Library</a>
+      <button class="ghost" id="navDraftsBtn">Drafts</button>
+      <button class="primary" id="navCaptureBtn">Launch Capture</button>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="chip">Creator link stable</span>
+        <h1>Build GIFs, stickers, and studio cards with a focused, futuristic bay.</h1>
+        <p>
+          Drag and drop assets, assemble frame stacks, and export clean packs. This studio is
+          client-first and only asks the server when you choose to save.
+        </p>
+        <div class="hero-actions">
+          <button class="primary" id="newSessionBtn">New session</button>
+          <button class="ghost" id="quickTourBtn">Quick tour</button>
+        </div>
+      </div>
+      <div class="hero-panel">
+        <div class="panel-title">Live signal</div>
+        <div class="signal-stack">
+          <div class="signal-card">
+            <div class="signal-head">
+              <span>Capture Bay</span>
+              <span class="status">Ready</span>
+            </div>
+            <div class="signal-body">
+              Drop any asset or pick a sample to start the flow.
+            </div>
+          </div>
+          <div class="signal-card">
+            <div class="signal-head">
+              <span>Render Queue</span>
+              <span class="status dim" id="renderStatus">Idle</span>
+            </div>
+            <div class="signal-body" id="renderNote">
+              Waiting on a build.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="studio">
+      <aside class="studio-rail">
+        <div class="rail-card">
+          <div class="rail-title">Modes</div>
+          <div class="mode-list" id="modeList">
+            <button class="mode-btn active" data-mode="gif">GIF Lab</button>
+            <button class="mode-btn" data-mode="sticker">Sticker Forge</button>
+            <button class="mode-btn" data-mode="card">Pulse Card</button>
+            <button class="mode-btn" data-mode="poster">Poster Grid</button>
+          </div>
+        </div>
+
+        <div class="rail-card">
+          <div class="rail-title">Asset Bay</div>
+          <div class="dropzone" id="dropzone">
+            <div class="drop-title">Drop images here</div>
+            <div class="drop-sub">or click to upload</div>
+            <input type="file" id="assetInput" accept="image/*" multiple />
+          </div>
+          <div class="asset-grid" id="assetGrid"></div>
+        </div>
+
+        <div class="rail-card">
+          <div class="rail-title">Frame Stack</div>
+          <div class="frame-list" id="frameList"></div>
+          <div class="frame-actions">
+            <button class="ghost" id="clearFramesBtn">Clear frames</button>
+            <button class="ghost" id="reverseFramesBtn">Reverse</button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="studio-main">
+        <div class="stage">
+          <div class="stage-head">
+            <div>
+              <div class="stage-title">Creator Canvas</div>
+              <div class="stage-sub" id="stageSub">Select a frame to preview.</div>
+            </div>
+            <div class="stage-actions">
+              <button class="ghost" id="playBtn">Play</button>
+              <button class="ghost" id="pauseBtn">Pause</button>
+              <button class="primary" id="exportBtn">Save to library</button>
+            </div>
+          </div>
+          <div class="stage-body">
+            <div class="canvas-wrap">
+              <canvas id="previewCanvas" width="360" height="360"></canvas>
+              <div class="canvas-overlay" id="canvasOverlay">Drop assets or pick a sample.</div>
+            </div>
+            <div class="controls">
+              <div class="control-group">
+                <label>Size</label>
+                <input type="range" id="sizeRange" min="160" max="640" value="320" />
+              </div>
+              <div class="control-group">
+                <label>Delay (ms)</label>
+                <input type="range" id="delayRange" min="60" max="600" value="120" />
+              </div>
+              <div class="control-group">
+                <label>Frame delay (ms)</label>
+                <div class="inline-control">
+                  <input type="number" id="frameDelayInput" min="60" max="1000" value="120" />
+                  <button class="ghost" id="applyDelayAllBtn" type="button">Apply all</button>
+                </div>
+              </div>
+              <div class="control-group">
+                <label>Zoom</label>
+                <input type="range" id="zoomRange" min="50" max="200" value="100" />
+              </div>
+              <div class="control-group">
+                <label>Offset X</label>
+                <input type="range" id="offsetXRange" min="-120" max="120" value="0" />
+              </div>
+              <div class="control-group">
+                <label>Offset Y</label>
+                <input type="range" id="offsetYRange" min="-120" max="120" value="0" />
+              </div>
+              <div class="control-group">
+                <label>Rotate</label>
+                <input type="range" id="rotateRange" min="-20" max="20" value="0" />
+              </div>
+              <div class="control-group">
+                <label>Fit</label>
+                <select id="fitSelect">
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label>Caption</label>
+                <input type="text" id="captionInput" placeholder="Type a caption" />
+              </div>
+              <div class="control-group">
+                <label>Caption X/Y</label>
+                <div class="inline-control">
+                  <input type="range" id="captionXRange" min="-120" max="120" value="0" />
+                  <input type="range" id="captionYRange" min="-120" max="120" value="0" />
+                </div>
+              </div>
+              <div class="control-group">
+                <label>Crop</label>
+                <div class="inline-control">
+                  <label class="checkline"><input type="checkbox" id="cropToggle" /> Enable</label>
+                  <button class="ghost" id="cropResetBtn" type="button">Reset</button>
+                </div>
+              </div>
+              <div class="control-group">
+                <label>Crop X/Y</label>
+                <div class="inline-control">
+                  <input type="range" id="cropXRange" min="0" max="100" value="50" />
+                  <input type="range" id="cropYRange" min="0" max="100" value="50" />
+                </div>
+              </div>
+              <div class="control-group">
+                <label>Crop size</label>
+                <input type="range" id="cropSizeRange" min="20" max="100" value="100" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="timeline">
+          <div class="timeline-head">
+            <div>
+              <div class="timeline-title">Timeline</div>
+              <div class="timeline-sub">Drag or reorder frames for your GIF.</div>
+            </div>
+            <div class="timeline-actions">
+              <button class="ghost" id="duplicateFrameBtn">Duplicate</button>
+              <button class="ghost" id="removeFrameBtn">Remove</button>
+            </div>
+          </div>
+          <div class="timeline-strip" id="timelineStrip"></div>
+        </div>
+      </section>
+
+      <aside class="studio-side">
+        <div class="panel-card">
+          <div class="panel-title">Sticker Tools</div>
+          <div class="control-group">
+            <label>Outline</label>
+            <input type="range" id="outlineRange" min="0" max="18" value="6" />
+          </div>
+          <div class="control-group">
+            <label>Shadow</label>
+            <input type="range" id="shadowRange" min="0" max="24" value="6" />
+          </div>
+          <div class="control-group">
+            <label>Background</label>
+            <input type="color" id="bgColorInput" value="#081c22" />
+          </div>
+          <div class="control-group">
+            <label>Sticker Text</label>
+            <input type="text" id="stickerTextInput" placeholder="Optional sticker text" />
+          </div>
+          <div class="control-group">
+            <label>Sticker Text X/Y</label>
+            <div class="inline-control">
+              <input type="range" id="stickerTextXRange" min="-120" max="120" value="0" />
+              <input type="range" id="stickerTextYRange" min="-120" max="120" value="0" />
+            </div>
+          </div>
+          <div class="control-group">
+            <label>Remove BG</label>
+            <div class="inline-control">
+              <label class="checkline"><input type="checkbox" id="removeBgToggle" /> Enable</label>
+              <input type="color" id="removeBgColor" value="#031016" />
+            </div>
+          </div>
+          <div class="control-group">
+            <label>BG tolerance</label>
+            <input type="range" id="removeBgTolerance" min="0" max="80" value="26" />
+          </div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-title">Card Tools</div>
+          <div class="control-group">
+            <label>Card Title</label>
+            <input type="text" id="cardTitleInput" placeholder="Pulse title" />
+          </div>
+          <div class="control-group">
+            <label>Card Line</label>
+            <input type="text" id="cardLineInput" placeholder="Supporting line" />
+          </div>
+          <div class="control-group">
+            <label>Accent</label>
+            <input type="color" id="accentColorInput" value="#62e6d9" />
+          </div>
+        </div>
+        <div class="panel-card" id="sendPanel">
+          <div class="panel-title">Send to Chat</div>
+          <div class="control-group">
+            <label>Contact</label>
+            <select id="sendContactSelect"></select>
+          </div>
+          <div class="control-group">
+            <label>Selected item</label>
+            <div class="status-note" id="sendSelection">None</div>
+          </div>
+          <button class="primary" id="sendBtn" type="button">Send to chat</button>
+        </div>
+        <div class="panel-card">
+          <div class="panel-title">Export</div>
+          <div class="export-stack">
+            <button class="primary" id="downloadBtn">Save to library</button>
+            <button class="ghost" id="saveBtn">Save to LinkUp</button>
+            <div class="status-note" id="statusNote">Ready.</div>
+          </div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <section class="modal" id="libraryModal" aria-hidden="true" aria-label="Library">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Library</div>
+        <div class="modal-sub">Saved GIFs and stickers live here.</div>
+      </div>
+      <a class="ghost nav-link" id="libraryCloseBtn" href="#" aria-label="Close library">Close</a>
+    </div>
+    <div class="inline-control">
+      <select id="libraryFilter">
+        <option value="all">All</option>
+        <option value="gif">GIFs</option>
+        <option value="sticker">Stickers</option>
+      </select>
+      <button class="ghost" id="libraryRefreshBtn" type="button">Refresh</button>
+    </div>
+    <div class="library-list" id="libraryList"></div>
+  </section>
+  <div class="modal-scrim" id="libraryScrim" aria-hidden="true"></div>
+
+  <div class="tour-scrim" id="tourScrim" aria-hidden="true"></div>
+  <div class="tour-card" id="tourCard" aria-hidden="true">
+    <div class="tour-step" id="tourStep">01</div>
+    <div class="tour-title" id="tourTitle">Welcome</div>
+    <div class="tour-text" id="tourText">Let’s build something.</div>
+    <div class="tour-actions">
+      <button class="ghost" id="tourPrevBtn" type="button">Back</button>
+      <button class="ghost" id="tourSkipBtn" type="button">Skip</button>
+      <button class="primary" id="tourNextBtn" type="button">Next</button>
+    </div>
+  </div>
+
+  <script src="/creator/creator.js"></script>
+</body>
+</html>
