@@ -263,6 +263,10 @@
 
   <!-- Left quick actions (floats above NOVA) -->
   <div class="left-tools" aria-label="Quick actions">
+    <button class="fabtool" id="creatorFab" data-kind="creator" type="button" aria-label="Creator studio">
+      <span class="ico" aria-hidden="true">◇</span>
+      <span class="lbl">Create</span>
+    </button>
     <button class="fabtool" id="leftSettingsBtn" data-kind="settings" type="button" aria-label="Settings">
       <span class="ico" aria-hidden="true">⚙</span>
       <span class="lbl">Settings</span>
@@ -449,6 +453,14 @@
     const attachChip = document.getElementById('attachChip');
     const attachName = document.getElementById('attachName');
     const attachClear = document.getElementById('attachClear');
+
+    const creatorFab = document.getElementById('creatorFab');
+
+    if (creatorFab) {
+      creatorFab.addEventListener('click', () => {
+        window.open('/creator', '_blank', 'noopener');
+      });
+    }
 
     const replyChip = document.getElementById('replyChip');
     const replyTitle = document.getElementById('replyTitle');
@@ -1219,6 +1231,162 @@
       setAvatarPresence(peerAvatarEl, !!info.is_online);
     }
 
+    function _removeNoContactsHint() {
+      const hints = chatList?.querySelectorAll?.('.hint') || [];
+      hints.forEach((el) => {
+        const txt = String(el.textContent || '').toLowerCase();
+        if (txt.includes('no contacts yet')) el.remove();
+      });
+    }
+
+    function _updateContactsCount(count) {
+      const badge = chatList?.querySelector?.('[data-section="contacts"] .count');
+      if (badge) badge.textContent = String(Math.max(0, Number(count) || 0));
+    }
+
+    function _ensureGroupsSection() {
+      if (!chatList) return null;
+      let section = chatList.querySelector('[data-section="groups"]');
+      if (section) return section;
+
+      section = document.createElement('div');
+      section.className = 'chat-section';
+      section.setAttribute('data-section', 'groups');
+      section.setAttribute('data-groups-hint', '1');
+      section.innerHTML = `
+        <span class="label">Groups</span>
+        <span class="count badge">0</span>
+      `;
+      chatList.appendChild(section);
+      return section;
+    }
+
+    function _updateGroupsCount(count) {
+      const badge = chatList?.querySelector?.('[data-section="groups"] .count');
+      if (badge) badge.textContent = String(Math.max(0, Number(count) || 0));
+    }
+
+    function _upsertContactInSidebar(contact) {
+      if (!chatList || !contact) return;
+      const uname = String(contact.username || '').trim();
+      if (!uname) return;
+      const key = uname.toLowerCase();
+      let existing = chatList.querySelector(`.chat[data-username="${CSS.escape(uname)}"]:not(.group-chat)`);
+      if (!existing) {
+        const rows = chatList.querySelectorAll('.chat[data-username]:not(.group-chat)');
+        existing = Array.from(rows).find(
+          (el) => String(el.getAttribute('data-username') || '').trim().toLowerCase() === key
+        ) || null;
+      }
+      if (existing) {
+        const avatarUrl = String(contact.avatar_url || '').trim();
+        if (avatarUrl) {
+          const avatar = existing.querySelector('.avatar');
+          if (avatar) {
+            avatar.setAttribute('data-avatar-url', avatarUrl);
+            setAvatarBg(avatar, avatarUrl);
+          }
+        }
+        return;
+      }
+
+      const a = document.createElement('a');
+      a.className = 'chat';
+      a.dataset.username = uname;
+      a.href = `{{ url_for('chats') }}?to=${encodeURIComponent(uname)}`;
+
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.setAttribute('aria-hidden', 'true');
+      avatar.style.width = '38px';
+      avatar.style.height = '38px';
+      const avatarUrl = String(contact.avatar_url || '').trim();
+      if (avatarUrl) {
+        avatar.setAttribute('data-avatar-url', avatarUrl);
+        setAvatarBg(avatar, avatarUrl);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = `
+        <strong>
+          <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(uname)}</span>
+          <span class="badge">Contact</span>
+        </strong>
+        <p>Tap to open chat</p>
+      `;
+
+      a.appendChild(avatar);
+      a.appendChild(meta);
+
+      const groupsHint = chatList.querySelector('[data-section="groups"], [data-groups-hint="1"]');
+      if (groupsHint) {
+        chatList.insertBefore(a, groupsHint);
+      } else {
+        chatList.appendChild(a);
+      }
+    }
+
+    async function refreshContactsSidebar() {
+      try {
+        const res = await fetch('/api/contacts/list');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const contacts = Array.isArray(data?.contacts) ? data.contacts : [];
+
+        if (Array.isArray(connectedContacts)) {
+          connectedContacts.splice(
+            0,
+            connectedContacts.length,
+            ...contacts
+              .map((c) => String(c?.username || '').trim())
+              .filter((u) => u)
+          );
+        }
+
+        _updateContactsCount(contacts.length);
+        if (contacts.length) _removeNoContactsHint();
+
+        contacts.forEach((c) => _upsertContactInSidebar(c));
+      } catch {
+        // ignore sidebar refresh failures
+      }
+    }
+
+    async function refreshGroupsSidebar() {
+      try {
+        const res = await fetch('/api/groups');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const groups = Array.isArray(data) ? data : (Array.isArray(data?.groups) ? data.groups : []);
+        const groupRows = chatList?.querySelectorAll?.('.chat.group-chat') || [];
+
+        if (!groups.length) {
+          groupRows.forEach((el) => el.remove());
+          chatList?.querySelector?.('[data-section="groups"]')?.remove();
+          return;
+        }
+
+        _ensureGroupsSection();
+        _updateGroupsCount(groups.length);
+
+        const liveIds = new Set(
+          groups
+            .map((g) => String(g?.id ?? '').trim())
+            .filter((gid) => gid)
+        );
+
+        groupRows.forEach((el) => {
+          const gid = String(el.getAttribute('data-group-id') || '').trim();
+          if (!gid || !liveIds.has(gid)) el.remove();
+        });
+
+        groups.forEach((g) => _upsertGroupInSidebar(g?.id, g?.name));
+      } catch {
+        // ignore group refresh failures
+      }
+    }
+
     function applyPresenceFromSidebar(directItems) {
       const map = new Map();
       for (const item of (Array.isArray(directItems) ? directItems : [])) {
@@ -1961,6 +2129,102 @@
       }
     }
 
+    const GIF_PLAY_MS = 2400;
+    const gifTimers = new WeakMap();
+
+    function scheduleGifFreeze(img) {
+      if (!img) return;
+      const prev = gifTimers.get(img);
+      if (prev) clearTimeout(prev);
+      const timer = setTimeout(() => {
+        if (img.dataset.gifStill) {
+          img.src = img.dataset.gifStill;
+          img.dataset.gifPlaying = '0';
+        }
+      }, GIF_PLAY_MS);
+      gifTimers.set(img, timer);
+    }
+
+    function setupGifPlayback(img, url) {
+      if (!img || !url) return;
+      img.dataset.gifSrc = url;
+      const captureStill = () => {
+        if (img.dataset.gifCaptured === '1') return;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 1;
+          canvas.height = img.naturalHeight || img.height || 1;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          img.dataset.gifStill = canvas.toDataURL('image/png');
+          img.dataset.gifCaptured = '1';
+        } catch {
+          // ignore capture failures
+        }
+      };
+      const onLoad = () => {
+        captureStill();
+        scheduleGifFreeze(img);
+      };
+      img.addEventListener('load', onLoad);
+      if (img.complete) {
+        onLoad();
+      }
+    }
+
+    function replayGif(img) {
+      const src = img?.dataset?.gifSrc;
+      if (!src) return;
+      img.src = src;
+      img.dataset.gifPlaying = '1';
+      scheduleGifFreeze(img);
+    }
+
+    const notifiedMsgIds = (window.__notifiedMsgIds instanceof Set) ? window.__notifiedMsgIds : new Set();
+    window.__notifiedMsgIds = notifiedMsgIds;
+
+    function formatNotificationPreview(m) {
+      if (m.content && String(m.content).trim()) {
+        const text = String(m.content).trim();
+        return text.length > 140 ? `${text.slice(0, 140)}…` : text;
+      }
+      if (m.attachment_url) {
+        const mime = String(m.attachment_mime || '').toLowerCase();
+        if (mime.includes('gif')) return 'Sent a GIF';
+        if (mime.startsWith('image/')) return 'Sent a photo';
+        return 'Sent an attachment';
+      }
+      return 'Sent a message';
+    }
+
+    function notifyMessage(m) {
+      if (!('Notification' in window)) return;
+      if (Notification.permission !== 'granted') return;
+      if (!m || m.deleted_for_all) return;
+      if ((m.sender_username || '') === meUsername) return;
+      const peerNameEl = document.getElementById('peerName');
+      const chatName = (peerNameEl?.textContent || '').trim();
+      const who = (m.sender_username || 'New message').trim();
+      const time = fmtTime(m.created_at) || '';
+      const preview = formatNotificationPreview(m);
+      const body = `${time ? time + ' • ' : ''}${preview}${activeKind === 'group' && chatName ? ` • ${chatName}` : ''}`;
+      const title = (activeKind === 'group' && chatName) ? `${chatName} • ${who}` : who;
+      const icon = (m.sender_avatar_url || m.sender_avatar || '').trim();
+      try {
+        new Notification(title, { body, tag: `msg-${m.id}`, icon: icon || undefined });
+      } catch {
+        // ignore notification failures
+      }
+    }
+
+    if ('Notification' in window) {
+      document.addEventListener('click', () => {
+        if (Notification.permission === 'default') {
+          Notification.requestPermission().catch(() => {});
+        }
+      }, { once: true });
+    }
+
     function renderMessages(msgs, options = {}) {
       const prevScrollTop = messagesEl.scrollTop;
       const prevClientHeight = messagesEl.clientHeight;
@@ -2069,13 +2333,24 @@
           const name = m.attachment_name || 'attachment';
           const mime = (m.attachment_mime || '').toLowerCase();
           const isImage = mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(url);
+          const isGif = mime.includes('gif') || /\.gif($|\?)/i.test(url);
 
           if (isImage) {
             const img = document.createElement('img');
             img.className = 'att-img';
             img.alt = name;
             img.src = url;
-            img.addEventListener('click', () => openLightbox(url, name));
+            img.addEventListener('click', (ev) => {
+              if (isGif) {
+                if (ev.detail >= 2) {
+                  openLightbox(url, name);
+                } else {
+                  replayGif(img);
+                }
+              } else {
+                openLightbox(url, name);
+              }
+            });
             const markSticker = () => {
               const w = img.naturalWidth || 0;
               const h = img.naturalHeight || 0;
@@ -2087,6 +2362,9 @@
             };
             img.addEventListener('load', markSticker);
             if (img.complete) markSticker();
+            if (isGif) {
+              setupGifPlayback(img, url);
+            }
             wrap.appendChild(img);
           } else {
             const a = document.createElement('a');
@@ -2514,6 +2792,12 @@
           window.__lastMsgs = combined;
           lastHash = JSON.stringify(combined);
           renderMessages(combined, { forceScroll: false });
+          additions.forEach((m) => {
+            const mid = Number(m?.id || 0);
+            if (!mid || notifiedMsgIds.has(mid)) return;
+            notifiedMsgIds.add(mid);
+            notifyMessage(m);
+          });
         }
       } else {
         window.__lastMsgs = Array.isArray(data) ? data : [];
@@ -2522,6 +2806,14 @@
           const isInitialRender = !lastHash;
           lastHash = h;
           renderMessages(data, { forceScroll: isInitialRender });
+          if (!isInitialRender) {
+            (Array.isArray(data) ? data : []).forEach((m) => {
+              const mid = Number(m?.id || 0);
+              if (!mid || notifiedMsgIds.has(mid)) return;
+              notifiedMsgIds.add(mid);
+              notifyMessage(m);
+            });
+          }
         }
       }
       refreshDirectUnreadBadges();
@@ -4462,6 +4754,10 @@
         const nextHash = applyRequestCounts(inbox, sent, gInbox, gSent);
         window.__reqCountsHash = nextHash;
 
+        if (previousHash && previousHash !== nextHash) {
+          refreshContactsSidebar();
+        }
+
         if (
           refreshDialog &&
           previousHash &&
@@ -4645,8 +4941,10 @@
           if (!username) return;
           try {
             await acceptContact(username);
-            toast('Contact accepted', 'Reloading contacts…');
-            window.location.reload();
+            toast('Contact accepted', 'Updating contacts...');
+            await loadInboxCount();
+            await refreshContactsSidebar();
+            await refreshDirectUnreadBadges();
           } catch (e) {
             toast('Accept failed', e.message || 'Try again');
           }
@@ -4661,7 +4959,7 @@
             await rejectContact(username);
             toast('Request rejected', username);
             await loadInboxCount({ refreshDialog: false });
-            window.location.reload();
+            await refreshContactsSidebar();
           } catch (e) {
             toast('Reject failed', e.message || 'Try again');
           }
@@ -4677,7 +4975,7 @@
             await withdrawContactRequest(username);
             toast('Request withdrawn', username);
             await loadInboxCount({ refreshDialog: false });
-            window.location.reload();
+            await refreshContactsSidebar();
           } catch (e) {
             toast('Withdraw failed', e.message || 'Try again');
           }
@@ -4692,7 +4990,8 @@
             await apiPost('/api/groups/invites/accept', { invite_id: inviteId });
             toast('Joined group', 'Success');
             await loadInboxCount({ refreshDialog: false });
-            window.location.reload();
+            await refreshGroupsSidebar();
+            await refreshDirectUnreadBadges();
           } catch (e) {
             toast('Join failed', e.message || 'Try again');
           }
@@ -4707,7 +5006,7 @@
             await apiPost('/api/groups/invites/withdraw', { invite_id: inviteId });
             toast('Invite withdrawn');
             await loadInboxCount({ refreshDialog: false });
-            window.location.reload();
+            await refreshGroupsSidebar();
           } catch (e) {
             toast('Withdraw failed', e.message || 'Try again');
           }
@@ -5208,16 +5507,7 @@
         const existing = chatList.querySelector(`a.group-chat[data-group-id="${CSS.escape(gid)}"]`);
         if (existing) return;
 
-        // Ensure Groups heading exists.
-        let groupsHint = chatList.querySelector('[data-groups-hint="1"]');
-        if (!groupsHint) {
-          groupsHint = document.createElement('div');
-          groupsHint.className = 'hint';
-          groupsHint.style.paddingTop = '10px';
-          groupsHint.textContent = 'Groups';
-          groupsHint.setAttribute('data-groups-hint', '1');
-          chatList.appendChild(groupsHint);
-        }
+        const groupsHint = _ensureGroupsSection();
 
         const a = document.createElement('a');
         a.className = 'chat group-chat';
@@ -6237,8 +6527,8 @@
 
     function getMessagesPollInterval() {
       if (document.visibilityState === 'hidden') return 8000;
-      if ((Date.now() - lastUserActivity) < ACTIVE_WINDOW_MS) return 1500;
-      return 3000;
+      if ((Date.now() - lastUserActivity) < ACTIVE_WINDOW_MS) return 500;
+      if ((Date.now() - lastUserActivity) < ACTIVE_WINDOW_MS) return 500;
     }
 
     function getInboxPollInterval() {

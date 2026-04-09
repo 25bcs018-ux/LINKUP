@@ -20,7 +20,7 @@ from PIL import Image, ImageDraw, ImageFont
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
-from flask import Flask, request, render_template, redirect, url_for, session, jsonify, send_from_directory
+from flask import Flask, request, render_template, render_template_string, redirect, url_for, session, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -53,6 +53,8 @@ def _normalize_db_uri(uri: str) -> str:
 
 
 app = Flask(__name__)
+
+CREATOR_DIR = Path(__file__).resolve().parent / "LINKUP CREATER"
 
 secret_key = os.environ.get("SECRET_KEY", "").strip()
 if not secret_key:
@@ -2378,6 +2380,27 @@ def privacy_policy():
 @app.route('/terms')
 def terms_and_conditions():
     return render_template('terms.html')
+
+
+@app.route('/creator')
+def creator_studio():
+    path = CREATOR_DIR / 'creator.html'
+    if not path.exists():
+        return 'Creator studio not found', 404
+    html = path.read_text(encoding='utf-8')
+    return render_template_string(html)
+
+
+@app.route('/creator/<path:filename>')
+def creator_assets(filename):
+    name = (filename or '').lower()
+    if name.endswith('.svg'):
+        return send_from_directory(CREATOR_DIR, filename, mimetype='image/svg+xml')
+    if name.endswith('.png'):
+        return send_from_directory(CREATOR_DIR, filename, mimetype='image/png')
+    if name.endswith('.gif'):
+        return send_from_directory(CREATOR_DIR, filename, mimetype='image/gif')
+    return send_from_directory(CREATOR_DIR, filename)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
