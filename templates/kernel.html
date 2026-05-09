@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" data-theme-user="{{ me.id if me else '' }}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KERNEL</title>
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="KERNEL" />
+  <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='kernel_page.css') }}" />
+  <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='kernel_page.js') }}"></script>
+</head>
+<body class="kernel-body">
+  <div class="kernel-shell" id="kernelApp">
+    <header class="kernel-top">
+      <div class="kernel-brand">
+        <div class="kernel-symbol" aria-hidden="true">
+          <span class="kernel-symbol-core">K</span>
+        </div>
+        <div class="kernel-brand-text">
+          <div class="kernel-title">KERNEL</div>
+          <div class="kernel-sub">Creator-grade control for your UI and layout.</div>
+        </div>
+      </div>
+      <div class="kernel-top-actions">
+        <a class="kernel-link" href="{{ url_for('void_sso', app='kernel') }}">Login with VOID</a>
+        <label class="kernel-label" for="kernelPageSelect">Target page</label>
+        <select class="kernel-select" id="kernelPageSelect">
+          <option value="chats" selected>Chats</option>
+          <option value="dashboard">Dashboard</option>
+          <option value="front">Front</option>
+          <option value="support">Support</option>
+          <option value="privacy">Privacy</option>
+          <option value="terms">Terms</option>
+          <option value="login">Login</option>
+          <option value="register">Register</option>
+        </select>
+        <a class="kernel-link" href="{{ url_for('chats') }}">Back to Chats</a>
+      </div>
+    </header>
+
+    <div class="kernel-grid">
+      <main class="kernel-main">
+        <div class="kernel-mount" id="kernelMount" aria-live="polite"></div>
+      </main>
+      <aside class="kernel-side">
+        <div class="kernel-card">
+          <strong>Quick tips</strong>
+          <ul class="kernel-list">
+            <li>Use Visual Mode to click and reposition any element on this page.</li>
+            <li>Save local to keep changes on this device only.</li>
+            <li>Connect to LinkUp to enable permanent per-user CSS.</li>
+          </ul>
+        </div>
+        <div class="kernel-card">
+          <strong>Open target</strong>
+          <p class="kernel-muted">Launch the selected page in a new tab for quick checks.</p>
+          <button class="kernel-btn" id="kernelOpenTarget" type="button">Open target page</button>
+        </div>
+        <div class="kernel-card">
+          <strong>Status</strong>
+          <div class="kernel-status" id="kernelStatus">Checking kernel session...</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

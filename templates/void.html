@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VOID • LinkUp</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='void.css') }}" />
+</head>
+<body data-void-step="intro">
+  <div class="void-bg" aria-hidden="true">
+    <div class="void-noise"></div>
+    <div class="void-moon"></div>
+    <div class="void-craters"></div>
+    <div class="void-vignette"></div>
+  </div>
+
+  <div class="void-intro" aria-hidden="true">
+    <div class="void-intro-core">
+      <div class="void-intro-orbit"></div>
+      <img src="{{ url_for('static', filename='brand/void-logo.png') }}" alt="" class="void-intro-logo" />
+      <div class="void-intro-title">VOID</div>
+    </div>
+  </div>
+
+  <main class="void-stage" role="main">
+    <section class="void-panel intro" aria-labelledby="voidTitle">
+      <div class="void-hero">
+        <div class="void-logo-wrap">
+          <img src="{{ url_for('static', filename='brand/void-logo.png') }}" alt="Void logo" class="void-logo" />
+        </div>
+
+        <div class="void-copy">
+          <h1 id="voidTitle" class="void-title">VOID</h1>
+        </div>
+      </div>
+
+      <a class="void-cta" href="{{ url_for('void_auth') }}" aria-label="Get started">
+        <span>Get started</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 4v14m0 0l-6-6m6 6l6-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </a>
+    </section>
+  </main>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      requestAnimationFrame(() => document.body.classList.add('void-enter'));
+    });
+  </script>
+</body>
+</html>

@@ -10,11 +10,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="LinkUp" />
     <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
-    <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+    <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
     <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body class="bg-animated{% if error %} auth-error{% endif %}">
+<body class="bg-animated{% if error %} auth-error{% endif %}" data-nova-context="auth">
     <div class="auth-page">
         <div class="auth-shell">
             {% if error %}
@@ -79,6 +80,7 @@
 
                 <div style="margin-top: 14px; display:flex; gap:10px; flex-wrap:wrap;">
                     <a class="btn" href="{{ url_for('auth_google_start') }}" style="text-decoration:none;">Continue with Google</a>
+                    <a class="btn ghost" href="{{ url_for('void_sso', app='linkup') }}" style="text-decoration:none;">Login with VOID</a>
                 </div>
 
                 <div class="small-links">
@@ -91,6 +93,8 @@
             </section>
         </div>
     </div>
+
+    {% include "partials/nova_widget.html" %}
 
         <script>
             const tryAgainBtn = document.getElementById('tryAgainBtn');
@@ -105,6 +109,9 @@
                 if (userInput) userInput.focus();
             });
         </script>
+        <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
+        <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
+        <script defer src="{{ url_for('static', filename='kernel_runtime.js') }}"></script>
         <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
 </body>
 </html>

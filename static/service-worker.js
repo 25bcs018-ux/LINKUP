@@ -13,7 +13,7 @@ const APP_SHELL = [
   '/static/chats.css',
   '/static/support.css',
   '/linkup-secure/static/secure.css',
-  '/static/linkup_logo.svg',
+  '/static/brand/void-logo.png',
   '/static/nova_logo.svg',
   '/static/register_suggest.js',
   '/static/pwa-register.js'

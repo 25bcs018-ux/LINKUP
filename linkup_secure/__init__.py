@@ -218,9 +218,9 @@ def link():
 @blueprint.get('/manifest.webmanifest')
 def secure_manifest():
     payload = {
-        'name': 'LinkUp Secure',
+        'name': 'Secure',
         'short_name': 'Secure',
-        'description': 'LinkUp Secure temporary private chat workspace.',
+        'description': 'Secure temporary private chat workspace.',
         'start_url': url_for('linkup_secure.home'),
         'scope': '/linkup-secure/',
         'display': 'standalone',
@@ -230,7 +230,7 @@ def secure_manifest():
         'theme_color': '#06131a',
         'icons': [
             {
-                'src': url_for('static', filename='linkup_logo.svg'),
+                'src': url_for('static', filename='brand/void-logo.png'),
                 'sizes': 'any',
                 'type': 'image/svg+xml',
                 'purpose': 'any'

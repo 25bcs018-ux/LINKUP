@@ -11,12 +11,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="LinkUp" />
   <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
-  <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+  <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='chats.css') }}" />
   <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body class="bg-animated">
+<body class="bg-animated" data-nova-context="chat">
   <div class="app">
     <div class="shell" id="shell"
          data-me-username="{{ me.username|e }}"
@@ -28,7 +28,7 @@
           data-me-avatar-url="{{ me_avatar_url|e }}"
           data-active-avatar-url="{{ active_avatar_url|e }}">
 
-      <aside class="sidebar" aria-label="Chats sidebar">
+      <aside class="sidebar" aria-label="Chats sidebar" data-nova-avoid="1">
         <div class="sb-top">
           <button class="me-btn" id="meBtn" type="button" aria-label="Me">
             <div class="avatar" id="meAvatar" aria-hidden="true"></div>
@@ -135,7 +135,7 @@
       </aside>
 
       <main class="main" aria-label="Conversation">
-        <div class="topbar">
+        <div class="topbar" data-nova-avoid="1">
           <div class="peer">
             <button class="iconbtn" id="openSidebarBtn" type="button" aria-label="Open chats">☰</button>
             <div class="avatar" id="peerAvatar" aria-hidden="true" style="width: 38px; height: 38px;"></div>
@@ -176,6 +176,31 @@
           </div>
         </div>
 
+        <div class="chat-loader" id="chatLoader" aria-hidden="true">
+          <div class="ghost-shell ghost-shell--chat" role="status" aria-live="polite" aria-label="Loading chat">
+            <span class="sr-only">Opening <span class="loader-name" id="chatLoaderName">chat</span>…</span>
+            <div class="ghost-main">
+              <div class="ghost-header">
+                <div class="ghost-avatar"></div>
+                <div class="ghost-lines">
+                  <div class="ghost-line w-40"></div>
+                  <div class="ghost-line w-25"></div>
+                </div>
+              </div>
+              <div class="ghost-messages">
+                <div class="ghost-bubble left"></div>
+                <div class="ghost-bubble right"></div>
+                <div class="ghost-bubble left"></div>
+                <div class="ghost-bubble right"></div>
+              </div>
+              <div class="ghost-composer">
+                <div class="ghost-line w-70"></div>
+                <div class="ghost-pill"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="messages" id="messages" aria-label="Messages">
           {% if not has_active_chat %}
             <div class="empty">
@@ -192,7 +217,7 @@
           {% endif %}
         </div>
 
-        <form class="composer" id="composer" autocomplete="off">
+        <form class="composer" id="composer" autocomplete="off" data-nova-avoid="1">
           <button class="cbtn" id="emojiBtn" type="button" aria-label="Emoji" {% if not has_active_chat %}disabled{% endif %}>😊</button>
           <button class="cbtn" id="gifBtn" type="button" aria-label="Send GIF" {% if not has_active_chat or active_kind == 'group' %}disabled{% endif %}>🎞️</button>
           <button class="cbtn" id="stickerBtn" type="button" aria-label="Send sticker" {% if not has_active_chat or active_kind == 'group' %}disabled{% endif %}>🧩</button>
@@ -226,9 +251,67 @@
   <div class="scrim" id="sidebarScrim" aria-hidden="true"></div>
 
   <div class="page-loader" id="pageLoader" aria-hidden="true">
-    <div class="loader-card" role="status" aria-live="polite">
-      <div class="loader-dot" aria-hidden="true"></div>
-      <div class="loader-text">Opening <span class="loader-name" id="loaderName">chat</span>…</div>
+    <div class="ghost-shell" role="status" aria-live="polite" aria-label="Loading">
+      <span class="sr-only">Opening <span class="loader-name" id="loaderName">chat</span>…</span>
+      <div class="ghost-sidebar">
+        <div class="ghost-row">
+          <div class="ghost-avatar"></div>
+          <div class="ghost-lines">
+            <div class="ghost-line w-60"></div>
+            <div class="ghost-line w-35"></div>
+          </div>
+        </div>
+        <div class="ghost-line w-40"></div>
+        <div class="ghost-list">
+          <div class="ghost-row">
+            <div class="ghost-avatar small"></div>
+            <div class="ghost-lines">
+              <div class="ghost-line w-55"></div>
+              <div class="ghost-line w-30"></div>
+            </div>
+          </div>
+          <div class="ghost-row">
+            <div class="ghost-avatar small"></div>
+            <div class="ghost-lines">
+              <div class="ghost-line w-50"></div>
+              <div class="ghost-line w-28"></div>
+            </div>
+          </div>
+          <div class="ghost-row">
+            <div class="ghost-avatar small"></div>
+            <div class="ghost-lines">
+              <div class="ghost-line w-58"></div>
+              <div class="ghost-line w-32"></div>
+            </div>
+          </div>
+          <div class="ghost-row">
+            <div class="ghost-avatar small"></div>
+            <div class="ghost-lines">
+              <div class="ghost-line w-52"></div>
+              <div class="ghost-line w-26"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ghost-main">
+        <div class="ghost-header">
+          <div class="ghost-avatar"></div>
+          <div class="ghost-lines">
+            <div class="ghost-line w-40"></div>
+            <div class="ghost-line w-25"></div>
+          </div>
+        </div>
+        <div class="ghost-messages">
+          <div class="ghost-bubble left"></div>
+          <div class="ghost-bubble right"></div>
+          <div class="ghost-bubble left"></div>
+          <div class="ghost-bubble right"></div>
+        </div>
+        <div class="ghost-composer">
+          <div class="ghost-line w-70"></div>
+          <div class="ghost-pill"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -259,10 +342,11 @@
   <div class="pop-menu" id="popMenu" role="menu" aria-hidden="true"></div>
 
   <script type="application/json" id="connectedContactsData">{{ users|map(attribute='username')|list|tojson }}</script>
+  <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
   <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
 
   <!-- Left quick actions (floats above NOVA) -->
-  <div class="left-tools" aria-label="Quick actions">
+  <div class="left-tools" aria-label="Quick actions" data-nova-avoid="1">
     <button class="fabtool" id="creatorFab" data-kind="creator" type="button" aria-label="Creator studio">
       <span class="ico" aria-hidden="true">◇</span>
       <span class="lbl">Create</span>
@@ -279,50 +363,13 @@
       <span class="ico" aria-hidden="true">≡</span>
       <span class="lbl">Menu</span>
     </button>
+    <button class="fabtool" id="kernelBtn" data-kind="kernel" type="button" aria-label="Kernel mode">
+      <span class="ico" aria-hidden="true">⌁</span>
+      <span class="lbl">Kernel</span>
+    </button>
   </div>
 
-  <!-- NOVA floating chat widget (preserves state when closed) -->
-  <button class="nova-fab" id="novaFab" type="button" aria-label="Chat with NOVA">
-    <span class="nova-label" aria-hidden="true">NOVA</span>
-    <span class="nova-logo" aria-hidden="true">
-      <span class="nova-ai" aria-hidden="true"></span>
-    </span>
-    <span class="nova-tip" aria-hidden="true">Chat with NOVA</span>
-  </button>
-  <span class="nova-fab-home" id="novaFabHome" aria-hidden="true"></span>
-
-  <section class="nova-panel" id="novaPanel" aria-label="NOVA chat" aria-hidden="true">
-    <header class="nova-hd">
-      <div class="left">
-        <span class="nova-badge" aria-hidden="true">
-          <span class="nova-ai" aria-hidden="true"></span>
-        </span>
-        <div class="meta">
-          <strong>NOVA</strong>
-          <span>Assistant</span>
-        </div>
-      </div>
-      <button class="nova-close" id="novaClose" type="button" aria-label="Close NOVA">✕</button>
-    </header>
-    <div class="nova-body" id="novaBody">
-      <div class="nova-hero" id="novaHero">
-        <div class="nova-hero-img" aria-hidden="true"><span class="nova-ai" aria-hidden="true"></span></div>
-        <div class="nova-hero-txt">
-          <div class="nova-hero-row">
-            <span class="nova-hero-badge" aria-hidden="true">NOVA</span>
-            <span class="nova-hero-hint" aria-hidden="true">Type /tour anytime</span>
-          </div>
-          <div class="nova-hero-title">Hi, I’m NOVA</div>
-          <div class="nova-hero-sub">Your LinkUp assistant — ask “how do I…” anytime.</div>
-        </div>
-      </div>
-      <div class="nova-messages" id="novaMessages"></div>
-    </div>
-    <form class="nova-composer" id="novaComposer" autocomplete="off">
-      <input class="nova-input" id="novaInput" placeholder="Message NOVA…" />
-      <button class="nova-send" type="submit">Send</button>
-    </form>
-  </section>
+  {% include "partials/nova_widget.html" %}
 
   <script>
     // ------------------ Theme (Light/Dark) ------------------
@@ -349,6 +396,28 @@
     }
 
     applyTheme(getPreferredTheme());
+
+    const NOVA_BUDDY_KEY = 'linkup_nova_buddy';
+
+    function isNovaBuddyEnabled() {
+      try {
+        const raw = (localStorage.getItem(NOVA_BUDDY_KEY) || '').trim().toLowerCase();
+        if (raw === '0' || raw === 'off' || raw === 'false') return false;
+        if (raw === '1' || raw === 'on' || raw === 'true') return true;
+      } catch {}
+      return true;
+    }
+
+    function setNovaBuddyEnabled(enabled) {
+      const on = !!enabled;
+      try { localStorage.setItem(NOVA_BUDDY_KEY, on ? '1' : '0'); } catch {}
+      document.body?.setAttribute('data-nova-buddy', on ? 'on' : 'off');
+      if (window.NovaBuddy?.setEnabled) {
+        window.NovaBuddy.setEnabled(on);
+      }
+    }
+
+    document.body?.setAttribute('data-nova-buddy', isNovaBuddyEnabled() ? 'on' : 'off');
 
     const CSRF_TOKEN = (document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '').trim();
     const _origFetch = window.fetch.bind(window);
@@ -502,6 +571,14 @@
     let novaPoll = null;
     let novaPollDelay = 1100;
 
+    function applyNovaDock() {
+      const dock = window.innerWidth < 900 ? 'right' : 'left';
+      try { document.body?.setAttribute('data-nova-dock', dock); } catch {}
+    }
+
+    applyNovaDock();
+    window.addEventListener('resize', applyNovaDock);
+
     function setNovaTyping(isTyping) {
       if (!novaTyping) return;
       novaTyping.classList.toggle('hidden', !isTyping);
@@ -570,6 +647,41 @@
         const body = document.getElementById('novaBody');
         if (body) body.scrollTop = body.scrollHeight;
       } catch {}
+    }
+
+    function shouldHandleSecure(text) {
+      const t = String(text || '').toLowerCase();
+      if (!t.includes('secure')) return false;
+      if (t.includes('linkup secure')) return true;
+      return t.includes('open') || t.includes('launch') || t.includes('go to') || t.includes('enter');
+    }
+
+    function shouldHandleCreator(text) {
+      const t = String(text || '').toLowerCase();
+      if (!t.includes('creator') && !t.includes('studio')) return false;
+      return t.includes('open') || t.includes('launch') || t.includes('go to') || t.includes('enter') || t.includes('creator');
+    }
+
+    function handleNovaCommand(text) {
+      if (shouldHandleSecure(text)) {
+        const ok = window.confirm('Open LinkUp Secure? I will log you out here first.');
+        if (!ok) {
+          toast('NOVA', 'Staying here.');
+          return true;
+        }
+        toast('NOVA', 'Opening LinkUp Secure…');
+        window.open('/linkup-secure', '_blank', 'noopener');
+        window.location.href = '/logout';
+        return true;
+      }
+
+      if (shouldHandleCreator(text)) {
+        toast('NOVA', 'Opening Creator Studio…');
+        window.open('/creator', '_blank', 'noopener');
+        return true;
+      }
+
+      return false;
     }
 
     const TRANSPORT_PREFIX = 'linkup-transport-v1|';
@@ -793,6 +905,11 @@
       if (!submitted) return;
       const sendBtn = novaComposer?.querySelector?.('.nova-send');
       const beforeHash = novaLastHash;
+
+      if (handleNovaCommand(submitted)) {
+        if (novaInput) novaInput.value = '';
+        return;
+      }
 
       const triggerTour = shouldTriggerNovaTour(submitted);
       if (triggerTour) {
@@ -1033,10 +1150,48 @@
       });
     }
 
+    let suppressPageLoader = false;
+
     function showPageLoader() {
       document.body.classList.add('page-loading');
       const loader = document.getElementById('pageLoader');
       if (loader) loader.setAttribute('aria-hidden', 'false');
+    }
+
+    function showChatLoader() {
+      const main = document.querySelector('.main');
+      const loader = document.getElementById('chatLoader');
+      main?.classList.add('chat-loading');
+      if (loader) loader.setAttribute('aria-hidden', 'false');
+    }
+
+    function hidePageLoader() {
+      const loader = document.getElementById('pageLoader');
+      if (loader) {
+        loader.classList.add('is-hiding');
+        loader.setAttribute('aria-hidden', 'true');
+      }
+      setTimeout(() => {
+        document.body.classList.remove('page-loading');
+        if (loader) {
+          loader.classList.remove('is-hiding');
+        }
+      }, 320);
+    }
+
+    function hideChatLoader() {
+      const main = document.querySelector('.main');
+      const loader = document.getElementById('chatLoader');
+      if (loader) {
+        loader.classList.add('is-hiding');
+        loader.setAttribute('aria-hidden', 'true');
+      }
+      setTimeout(() => {
+        main?.classList.remove('chat-loading');
+        if (loader) {
+          loader.classList.remove('is-hiding');
+        }
+      }, 240);
     }
 
     function showPageLoaderFor(name) {
@@ -1044,6 +1199,13 @@
       const el = document.getElementById('loaderName');
       if (el) el.textContent = label;
       showPageLoader();
+    }
+
+    function showChatLoaderFor(name) {
+      const label = (name || '').trim() || 'chat';
+      const el = document.getElementById('chatLoaderName');
+      if (el) el.textContent = label;
+      showChatLoader();
     }
 
     // Apply dataset-provided avatars (ensures JS knows them even if template didn't inline styles)
@@ -1087,7 +1249,8 @@
       e.preventDefault();
 
       const name = a.querySelector('.meta strong span')?.textContent || a.getAttribute('data-username') || 'chat';
-      showPageLoaderFor(name);
+      suppressPageLoader = true;
+      showChatLoaderFor(name);
       if (isMobile()) closeSidebar();
 
       const href = a.getAttribute('href');
@@ -1098,7 +1261,15 @@
 
     // Show loader on any navigation away (contact switches, refresh).
     window.addEventListener('beforeunload', () => {
-      showPageLoaderFor('refreshing');
+      if (!suppressPageLoader) {
+        showPageLoaderFor('refreshing');
+      }
+    });
+
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        hidePageLoader();
+      }, 1);
     });
 
     function ensureUnreadBadge(chatEl) {
@@ -2745,6 +2916,50 @@
 
     let lastHash = '';
     let firstLoad = true;
+    const MSG_CACHE_PREFIX = 'linkup_msg_cache_v1:';
+    const MSG_CACHE_LIMIT = 140;
+
+    function getMessagesCacheKey() {
+      if (activeKind === 'group') {
+        if (!activeGroupId) return '';
+        return `${MSG_CACHE_PREFIX}group:${String(activeGroupId)}`;
+      }
+      if (!activeUsername) return '';
+      return `${MSG_CACHE_PREFIX}user:${String(activeUsername)}`;
+    }
+
+    function loadMessagesCache() {
+      const key = getMessagesCacheKey();
+      if (!key) return [];
+      try {
+        const raw = localStorage.getItem(key);
+        const data = raw ? JSON.parse(raw) : [];
+        return Array.isArray(data) ? data : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveMessagesCache(list) {
+      const key = getMessagesCacheKey();
+      if (!key) return;
+      const items = Array.isArray(list) ? list.slice(-MSG_CACHE_LIMIT) : [];
+      try {
+        localStorage.setItem(key, JSON.stringify(items));
+      } catch {
+        // ignore quota errors
+      }
+    }
+
+    function hydrateMessagesFromCache() {
+      if (!messagesEl) return;
+      const cached = loadMessagesCache();
+      if (!cached.length) return;
+      window.__lastMsgs = cached;
+      lastHash = JSON.stringify(cached);
+      firstLoad = false;
+      renderMessages(cached, { forceScroll: true });
+    }
     function getLastMessageId() {
       const list = Array.isArray(window.__lastMsgs) ? window.__lastMsgs : [];
       if (!list.length) return 0;
@@ -2792,6 +3007,7 @@
           window.__lastMsgs = combined;
           lastHash = JSON.stringify(combined);
           renderMessages(combined, { forceScroll: false });
+          saveMessagesCache(combined);
           additions.forEach((m) => {
             const mid = Number(m?.id || 0);
             if (!mid || notifiedMsgIds.has(mid)) return;
@@ -2806,6 +3022,7 @@
           const isInitialRender = !lastHash;
           lastHash = h;
           renderMessages(data, { forceScroll: isInitialRender });
+          saveMessagesCache(data);
           if (!isInitialRender) {
             (Array.isArray(data) ? data : []).forEach((m) => {
               const mid = Number(m?.id || 0);
@@ -5782,6 +5999,15 @@
             if (pill) pill.textContent = `Theme: ${tl}`;
           });
 
+          const buddyStatus = document.getElementById('novaBuddyStatus');
+          const buddyToggle = document.getElementById('novaBuddyToggle');
+          buddyToggle?.addEventListener('click', () => {
+            const next = !isNovaBuddyEnabled();
+            setNovaBuddyEnabled(next);
+            if (buddyStatus) buddyStatus.textContent = `Buddy mode: ${next ? 'On' : 'Off'}`;
+            if (buddyToggle) buddyToggle.textContent = next ? 'Turn off' : 'Turn on';
+          });
+
           document.getElementById('copyUsername')?.addEventListener('click', async () => {
             try {
               if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -5820,6 +6046,8 @@
         function openSettingsMain() {
           const t = (document.documentElement.getAttribute('data-theme') || getPreferredTheme());
           const tl = t === 'light' ? 'Light' : 'Dark';
+          const buddyEnabled = isNovaBuddyEnabled();
+          const buddyLabel = buddyEnabled ? 'On' : 'Off';
           openDialog('Settings', `
             <div class="detail-hero">
               <div class="detail-avatar avatar" style="${meAvatarUrl ? `background-image:url('${escapeHtml(meAvatarUrl)}')` : ''}"></div>
@@ -5844,6 +6072,17 @@
                   </div>
                 </div>
                 <button class="btn" type="button" id="themeToggle">Toggle</button>
+              </div>
+
+              <div class="row">
+                <div style="display:flex; gap:12px; align-items:center; min-width:0;">
+                  <div class="row-ico" aria-hidden="true">N</div>
+                  <div class="left">
+                    <strong>NOVA buddy</strong>
+                    <span id="novaBuddyStatus">Buddy mode: ${buddyLabel}</span>
+                  </div>
+                </div>
+                <button class="btn" type="button" id="novaBuddyToggle">${buddyEnabled ? 'Turn off' : 'Turn on'}</button>
               </div>
 
               <div class="row">
@@ -6511,9 +6750,12 @@
 
     // Initial load + adaptive poll
     applyWallpaperForActiveChat();
+    hydrateMessagesFromCache();
     refreshMessages();
-    loadInboxCount();
-    refreshDirectUnreadBadges();
+    deferWork(() => {
+      loadInboxCount();
+      refreshDirectUnreadBadges();
+    });
     schedulePresencePing(true);
 
     let lastUserActivity = Date.now();
@@ -6527,8 +6769,10 @@
 
     function getMessagesPollInterval() {
       if (document.visibilityState === 'hidden') return 8000;
-      if ((Date.now() - lastUserActivity) < ACTIVE_WINDOW_MS) return 500;
-      if ((Date.now() - lastUserActivity) < ACTIVE_WINDOW_MS) return 500;
+      const idleMs = Date.now() - lastUserActivity;
+      if (idleMs < ACTIVE_WINDOW_MS) return 500;
+      if (idleMs < 20000) return 1200;
+      return 2200;
     }
 
     function getInboxPollInterval() {
@@ -6591,5 +6835,7 @@
     // On mobile, open sidebar by default if no chat is active
     if (!activeUsername && isMobile()) openSidebar();
   </script>
+  <script defer src="{{ url_for('static', filename='kernel_runtime.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='kernel_mode.js') }}"></script>
 </body>
 </html>

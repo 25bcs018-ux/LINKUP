@@ -38,6 +38,7 @@ export FLASK_DEBUG="${FLASK_DEBUG:-0}"
 export PORT="${PORT:-8000}"
 export EMAIL_VERIFY_REQUIRED="${EMAIL_VERIFY_REQUIRED:-1}"
 export LINKUP_CREATE_TABLES="${LINKUP_CREATE_TABLES:-1}"
+export GEMINI_API_KEY="AIzaSyClPU3HBb0EBReglOUvFIRLkRGYBK2N4Rg"
 
 # Make sure runtime folders exist.
 mkdir -p "instance/uploads" "static/avatars"

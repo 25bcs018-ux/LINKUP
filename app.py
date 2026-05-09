@@ -154,6 +154,8 @@ def _csrf_protect():
 
     path = request.path or ''
     is_api = path.startswith('/api/') or path.startswith('/linkup-secure/api/')
+    if path == '/api/nova/guest':
+        return None
     protected_form_paths = {
         '/login',
         '/register',
@@ -268,6 +270,17 @@ class User(db.Model):
 
     def __repr__(self):
         return f"<User {self.username}>"
+
+
+class VoidAccount(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(20), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+    def __repr__(self):
+        return f"<VoidAccount {self.username}>"
 
 
 class Message(db.Model):
@@ -488,6 +501,24 @@ class EmailVerifyOTP(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
 
+class KernelAccount(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(40), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    linked_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+
+class KernelCss(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    kernel_account_id = db.Column(db.Integer, db.ForeignKey('kernel_account.id'), nullable=True)
+    page_key = db.Column(db.String(80), nullable=False)
+    css_text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+
 # Create tables early for entrypoints like `flask run`.
 _ensure_db_create_all()
 
@@ -526,11 +557,36 @@ def _ensure_global_emoji_table() -> None:
 _ensure_global_emoji_table()
 
 
+def _ensure_void_account_table() -> None:
+    try:
+        with app.app_context():
+            VoidAccount.__table__.create(bind=db.engine, checkfirst=True)
+    except Exception:
+        return
+
+
+_ensure_void_account_table()
+
+
 def _get_me():
     user_id = session.get('user_id')
     if not user_id:
         return None
     return _db_get(User, user_id)
+
+
+def _get_void_user():
+    void_id = session.get('void_user_id')
+    if not void_id:
+        return None
+    return _db_get(VoidAccount, void_id)
+
+
+def _get_kernel_account() -> KernelAccount | None:
+    kernel_id = session.get('kernel_account_id')
+    if not kernel_id:
+        return None
+    return _db_get(KernelAccount, kernel_id)
 
 
 def _is_user_online(user: User | None, now: datetime | None = None) -> bool:
@@ -1201,6 +1257,40 @@ def _nova_generate_reply(user_text: str, me: User) -> str:
         "I’m here. If you want, paste the exact error/output or describe the goal in one sentence.\n\n"
         f"You said: \"{snippet}\""
     )
+
+
+def _nova_guest_reply(user_text: str) -> str:
+    """Guest-mode helper with limited navigation support."""
+    t = (user_text or '').strip()
+    low = t.lower()
+    if not t:
+        return "Ask me about sign in, register, terms, privacy, or how LinkUp works."
+
+    if any(k in low for k in ('sign in', 'signin', 'log in', 'login')):
+        return "To sign in, open the Login page and enter your username or email plus password."
+
+    if any(k in low for k in ('register', 'create account', 'sign up', 'signup')):
+        return "To create an account, open Register and choose a username, email, and password."
+
+    if 'terms' in low:
+        return "You can read the Terms & Conditions from the footer or the Terms page."
+
+    if 'privacy' in low:
+        return "You can read the Privacy Policy from the footer or the Privacy page."
+
+    if 'secure' in low:
+        return "LinkUp Secure is a separate protected workspace. Open LinkUp Secure from the footer or ask me to open it."
+
+    if 'creator' in low:
+        return "Creator Studio lets you build assets. Ask me to open Creator from inside the app."
+
+    if any(k in low for k in ('how', 'what is', 'app', 'linkup')):
+        return (
+            "LinkUp is a simple chat app with contact requests, groups, and built-in NOVA assistance. "
+            "Sign in to unlock full chat and personalization."
+        )
+
+    return "I can help with sign in, register, terms, privacy, or how the app works."
 
 
 def _nova_history_for_user(me: User, nova: User, limit: int = 18):
@@ -2250,6 +2340,26 @@ def _username_exists(username: str) -> bool:
         return False
 
 
+def _void_username_exists(username: str) -> bool:
+    u = (username or '').strip()
+    if not u:
+        return False
+    try:
+        return VoidAccount.query.filter(db.func.lower(VoidAccount.username) == u.lower()).first() is not None
+    except Exception:
+        return False
+
+
+def _void_email_exists(email: str) -> bool:
+    e = (email or '').strip()
+    if not e:
+        return False
+    try:
+        return VoidAccount.query.filter(db.func.lower(VoidAccount.email) == e.lower()).first() is not None
+    except Exception:
+        return False
+
+
 def _generate_unique_username(raw: str) -> str:
     base = (_username_seed(raw) or '').lower()
     if not base or not _is_valid_username(base):
@@ -2266,6 +2376,16 @@ def _generate_unique_username(raw: str) -> str:
 def _login_user(user: User) -> None:
     session['user_id'] = user.id
     session['username'] = user.username
+
+
+def _login_void_user(void_user: VoidAccount) -> None:
+    session['void_user_id'] = void_user.id
+    session['void_username'] = void_user.username
+
+
+def _logout_void_user() -> None:
+    session.pop('void_user_id', None)
+    session.pop('void_username', None)
 
 
 def _fit_with_suffix(base: str, suffix: str, max_len: int = 15) -> str:
@@ -2355,6 +2475,219 @@ def _available_username_suggestions(raw: str, limit: int = 8) -> list[str]:
 # ------------------ ROUTES ------------------
 
 @app.route('/')
+def void_root():
+    return render_template('void.html')
+
+
+@app.route('/void-auth')
+def void_auth():
+    created = request.args.get('created') == '1'
+    next_app = (request.args.get('next') or '').strip().lower()
+    return render_template('void_auth.html', created=created, next_app=next_app)
+
+
+def _void_app_redirect(app_key: str) -> str:
+    app_key = (app_key or '').strip().lower()
+    if app_key == 'linkup':
+        return url_for('chats')
+    if app_key == 'secure':
+        return url_for('linkup_secure.home')
+    if app_key == 'kernel':
+        return url_for('kernel_page')
+    if app_key == 'creator':
+        return url_for('creator_studio')
+    return url_for('void_hub')
+
+
+def _void_linkup_username_seed(raw: str) -> str:
+    seed = (raw or '').strip().lower()
+    return seed[:15] if seed else 'voiduser'
+
+
+def _linkup_user_from_void(void_user: VoidAccount):
+    email = _normalize_email(void_user.email or '')
+    if email:
+        existing_email = User.query.filter(db.func.lower(User.email) == email.lower()).first()
+        if existing_email:
+            return existing_email
+
+    seed = _void_linkup_username_seed(void_user.username)
+    existing_name = User.query.filter(db.func.lower(User.username) == seed.lower()).first()
+    if existing_name and existing_name.email and email and existing_name.email.lower() == email.lower():
+        return existing_name
+
+    if existing_name:
+        suggestions = _available_username_suggestions(seed)
+        if suggestions:
+            seed = suggestions[0]
+        else:
+            seed = _fit_with_suffix(seed, str(random.randint(10, 999)), 15)
+
+    password = secrets.token_urlsafe(18)
+    user = User(
+        username=seed,
+        password=generate_password_hash(password),
+        email=email or f"{seed}@void.local",
+        email_verified=True,
+        display_name=seed,
+        theme_base=_THEME_DEFAULT_BASE,
+        theme_intensity=_THEME_DEFAULT_INTENSITY,
+    )
+    db.session.add(user)
+    db.session.commit()
+    return user
+
+
+@app.route('/void/privacy')
+def void_privacy():
+    return render_template('void_privacy.html')
+
+
+@app.route('/void/terms')
+def void_terms():
+    return render_template('void_terms.html')
+
+
+@app.route('/void-hub')
+def void_hub():
+    void_user = _get_void_user()
+    if not void_user:
+        return redirect(url_for('void_auth'))
+    return render_template('void_hub.html', void_user=void_user)
+
+
+@app.route('/void/login', methods=['POST'])
+def void_login():
+    identifier = (request.form.get('username') or '').strip()
+    password = request.form.get('password') or ''
+    next_app = (request.form.get('next') or '').strip().lower()
+
+    void_user = VoidAccount.query.filter(db.func.lower(VoidAccount.username) == identifier.lower()).first()
+    if not void_user and '@' in identifier:
+        void_user = VoidAccount.query.filter(db.func.lower(VoidAccount.email) == _normalize_email(identifier).lower()).first()
+
+    if void_user and check_password_hash(void_user.password, password):
+        _login_void_user(void_user)
+        if next_app:
+            if next_app == 'linkup':
+                user = _linkup_user_from_void(void_user)
+                _login_user(user)
+            return redirect(_void_app_redirect(next_app))
+        return redirect(url_for('void_hub'))
+
+    return render_template(
+        'void_auth.html',
+        void_error="Invalid VOID credentials.",
+        void_tab='signin',
+        prefill_username=identifier or '',
+        next_app=next_app,
+    ), 401
+
+
+@app.route('/void/register', methods=['POST'])
+def void_register():
+    username = (request.form.get('username') or '').strip()
+    password = request.form.get('password') or ''
+    email = _normalize_email(request.form.get('email') or '')
+    cpwd = request.form.get('confirm_password') or ''
+    accept_terms = request.form.get('accept_terms')
+    next_app = (request.form.get('next') or '').strip().lower()
+
+    if not username or not password or not email:
+        return render_template(
+            'void_auth.html',
+            void_error="Please fill all fields.",
+            void_tab='create',
+            prefill_username=username or '',
+            prefill_email=email or '',
+            next_app=next_app,
+        ), 400
+
+    if not _is_valid_username(username):
+        return render_template(
+            'void_auth.html',
+            void_error="Username must be 3–15 characters and contain only letters, numbers, underscore, dot.",
+            void_tab='create',
+            prefill_username=username or '',
+            prefill_email=email or '',
+            next_app=next_app,
+        ), 400
+
+    if accept_terms != 'on':
+        return render_template(
+            'void_auth.html',
+            void_error="Please accept the Terms & Conditions and Privacy Policy to continue.",
+            void_tab='create',
+            prefill_username=username or '',
+            prefill_email=email or '',
+            next_app=next_app,
+        ), 400
+
+    if _void_username_exists(username):
+        return render_template(
+            'void_auth.html',
+            void_error="VOID username already exists.",
+            void_tab='create',
+            prefill_username=username or '',
+            prefill_email=email or '',
+            next_app=next_app,
+        ), 400
+
+    if _void_email_exists(email):
+        return render_template(
+            'void_auth.html',
+            void_error="VOID email already exists.",
+            void_tab='create',
+            prefill_username=username or '',
+            prefill_email=email or '',
+            next_app=next_app,
+        ), 400
+
+    if password != cpwd:
+        return render_template(
+            'void_auth.html',
+            void_error="Passwords do not match.",
+            void_tab='create',
+            prefill_username=username or '',
+            prefill_email=email or '',
+            next_app=next_app,
+        ), 400
+
+    hashed_password = generate_password_hash(password)
+    void_user = VoidAccount(username=username, password=hashed_password, email=email)
+    db.session.add(void_user)
+    db.session.commit()
+
+    if next_app:
+        _login_void_user(void_user)
+        if next_app == 'linkup':
+            user = _linkup_user_from_void(void_user)
+            _login_user(user)
+        return redirect(_void_app_redirect(next_app))
+
+    return redirect(url_for('void_auth', created='1'))
+
+
+@app.route('/void/sso')
+def void_sso():
+    app_key = (request.args.get('app') or '').strip().lower()
+    void_user = _get_void_user()
+    if not void_user:
+        return redirect(url_for('void_auth', next=app_key))
+
+    if app_key == 'linkup':
+        user = _linkup_user_from_void(void_user)
+        _login_user(user)
+    return redirect(_void_app_redirect(app_key))
+
+
+@app.route('/void/logout')
+def void_logout():
+    _logout_void_user()
+    return redirect(url_for('void_auth'))
+
+
+@app.route('/front')
 def front():
     return render_template('front.html')
 
@@ -2410,8 +2743,18 @@ def register():
         email = _normalize_email(request.form.get('email') or '')
         cpwd = request.form.get('confirm_password')
         accept_terms = request.form.get('accept_terms')
+        next_dest = (request.form.get('next') or '').strip().lower()
+        using_void = next_dest == 'void_hub'
 
         if not username or not password or not email:
+            if using_void:
+                return render_template(
+                    'void_auth.html',
+                    void_error="Please fill all fields.",
+                    void_tab='create',
+                    prefill_username=username or '',
+                    prefill_email=email or '',
+                ), 400
             return render_template(
                 'register.html',
                 error="Please fill all fields.",
@@ -2420,6 +2763,14 @@ def register():
             ), 400
 
         if not _is_valid_username(username):
+            if using_void:
+                return render_template(
+                    'void_auth.html',
+                    void_error="Username must be 3–15 characters and contain only letters, numbers, underscore, dot.",
+                    void_tab='create',
+                    prefill_username=username or '',
+                    prefill_email=email or '',
+                ), 400
             return render_template(
                 'register.html',
                 error="Username must be 3–15 characters and contain only letters, numbers, underscore, dot.",
@@ -2429,6 +2780,14 @@ def register():
             ), 400
 
         if accept_terms != 'on':
+            if using_void:
+                return render_template(
+                    'void_auth.html',
+                    void_error="Please accept the Terms & Conditions and Privacy Policy to continue.",
+                    void_tab='create',
+                    prefill_username=username or '',
+                    prefill_email=email or '',
+                ), 400
             return render_template(
                 'register.html',
                 error="Please accept the Terms & Conditions and Privacy Policy to continue.",
@@ -2437,6 +2796,14 @@ def register():
             ), 400
         # Check duplicates
         if User.query.filter(db.func.lower(User.username) == username.lower()).first():
+            if using_void:
+                return render_template(
+                    'void_auth.html',
+                    void_error="Username already exists.",
+                    void_tab='create',
+                    prefill_username=username or '',
+                    prefill_email=email or '',
+                ), 400
             return render_template(
                 'register.html',
                 error="Username already exists.",
@@ -2446,6 +2813,14 @@ def register():
             ), 400
 
         if User.query.filter(db.func.lower(User.email) == email.lower()).first():
+            if using_void:
+                return render_template(
+                    'void_auth.html',
+                    void_error="Email already exists.",
+                    void_tab='create',
+                    prefill_username=username or '',
+                    prefill_email=email or '',
+                ), 400
             return render_template(
                 'register.html',
                 error="Email already exists.",
@@ -2456,6 +2831,14 @@ def register():
         hashed_password = generate_password_hash(password)
         
         if password != cpwd:
+            if using_void:
+                return render_template(
+                    'void_auth.html',
+                    void_error="Passwords do not match.",
+                    void_tab='create',
+                    prefill_username=username or '',
+                    prefill_email=email or '',
+                ), 400
             return render_template(
                 'register.html',
                 error="Passwords do not match.",
@@ -2482,6 +2865,14 @@ def register():
         if _email_verification_required() and not getattr(new_user, 'email_verified', False):
             sent, _dev_code = _send_verification_otp(new_user)
             if PRODUCTION and not sent:
+                if using_void:
+                    return render_template(
+                        'void_auth.html',
+                        void_error="Could not send OTP. Please try again later.",
+                        void_tab='create',
+                        prefill_username=username or '',
+                        prefill_email=email or '',
+                    ), 503
                 return render_template(
                     'register.html',
                     error="Could not send OTP. Please try again later.",
@@ -2490,6 +2881,8 @@ def register():
                 ), 503
             return redirect(url_for('email_not_verified', username=new_user.username))
 
+        if next_dest == 'void_hub':
+            return redirect(url_for('void_auth', created='1'))
         return redirect(url_for('login', registered='1'))
     return render_template('register.html')
 
@@ -2526,6 +2919,8 @@ def login():
     if request.method == 'POST':
         identifier = (request.form.get('username') or '').strip()
         password = request.form.get('password')
+        next_dest = (request.form.get('next') or '').strip().lower()
+        using_void = next_dest == 'void_hub'
 
         user = _find_user_by_username(identifier)
         if not user and '@' in identifier:
@@ -2539,9 +2934,17 @@ def login():
             # Trigger onboarding only for newly created accounts, and only once.
             if session.pop('new_account', None) == '1' and not getattr(user, 'onboarding_seen', False):
                 session['show_onboarding'] = '1'
-
+            if next_dest == 'void_hub':
+                return redirect(url_for('void_hub'))
             return redirect(url_for('chats'))
         else:
+            if using_void:
+                return render_template(
+                    'void_auth.html',
+                    void_error="Invalid username or password.",
+                    void_tab='signin',
+                    prefill_username=identifier or '',
+                ), 401
             return render_template('login.html', error="Invalid username or password."), 401
             
     ok = None
@@ -3770,6 +4173,137 @@ def api_account_me():
     })
 
 
+@app.route('/api/kernel/status', methods=['GET'])
+def api_kernel_status():
+    acct = _get_kernel_account()
+    return jsonify({
+        'ok': True,
+        'kernel_logged_in': bool(acct),
+        'kernel_username': acct.username if acct else '',
+        'linked_user_id': int(acct.linked_user_id) if acct and acct.linked_user_id else None,
+    })
+
+
+@app.route('/api/kernel/register', methods=['POST'])
+def api_kernel_register():
+    payload = request.get_json(silent=True) or {}
+    username = (payload.get('username') or '').strip()
+    password = (payload.get('password') or '').strip()
+    if len(username) < 3 or len(username) > 40:
+        return jsonify({'error': 'invalid_username'}), 400
+    if len(password) < 6 or len(password) > 120:
+        return jsonify({'error': 'invalid_password'}), 400
+
+    existing = KernelAccount.query.filter(db.func.lower(KernelAccount.username) == username.lower()).first()
+    if existing:
+        return jsonify({'error': 'username_taken'}), 409
+
+    acct = KernelAccount(
+        username=username,
+        password_hash=generate_password_hash(password),
+    )
+    db.session.add(acct)
+    db.session.commit()
+    session['kernel_account_id'] = acct.id
+    return jsonify({'ok': True})
+
+
+@app.route('/api/kernel/login', methods=['POST'])
+def api_kernel_login():
+    payload = request.get_json(silent=True) or {}
+    username = (payload.get('username') or '').strip()
+    password = (payload.get('password') or '').strip()
+    if not username or not password:
+        return jsonify({'error': 'missing_credentials'}), 400
+
+    acct = KernelAccount.query.filter(db.func.lower(KernelAccount.username) == username.lower()).first()
+    if not acct or not check_password_hash(acct.password_hash, password):
+        return jsonify({'error': 'invalid_credentials'}), 401
+
+    session['kernel_account_id'] = acct.id
+    return jsonify({'ok': True})
+
+
+@app.route('/api/kernel/logout', methods=['POST'])
+def api_kernel_logout():
+    session.pop('kernel_account_id', None)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/kernel/connect', methods=['POST'])
+def api_kernel_connect():
+    acct = _get_kernel_account()
+    if not acct:
+        return jsonify({'error': 'kernel_not_authenticated'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    username = (payload.get('username') or '').strip()
+    password = (payload.get('password') or '').strip()
+    if not username or not password:
+        return jsonify({'error': 'missing_credentials'}), 400
+
+    user = User.query.filter(db.func.lower(User.username) == username.lower()).first()
+    if not user or not check_password_hash(user.password, password):
+        return jsonify({'error': 'invalid_credentials'}), 401
+
+    acct.linked_user_id = user.id
+    db.session.commit()
+    return jsonify({'ok': True, 'linked_user_id': int(user.id)})
+
+
+@app.route('/api/kernel/css', methods=['GET'])
+def api_kernel_css_get():
+    page_key = (request.args.get('page') or '').strip() or 'default'
+    acct = _get_kernel_account()
+    if not acct:
+        return jsonify({'error': 'kernel_not_authenticated'}), 401
+
+    user_id = int(acct.linked_user_id) if acct.linked_user_id else None
+    query = KernelCss.query.filter_by(page_key=page_key)
+    if user_id:
+        query = query.filter_by(user_id=user_id)
+    else:
+        query = query.filter_by(kernel_account_id=acct.id)
+
+    row = query.order_by(KernelCss.updated_at.desc(), KernelCss.id.desc()).first()
+    return jsonify({'ok': True, 'css': row.css_text if row else ''})
+
+
+@app.route('/api/kernel/css/save', methods=['POST'])
+def api_kernel_css_save():
+    payload = request.get_json(silent=True) or {}
+    page_key = (payload.get('page') or '').strip() or 'default'
+    css_text = (payload.get('css') or '').strip()
+    mode = (payload.get('mode') or '').strip().lower() or 'local'
+    if len(css_text) > 12000:
+        return jsonify({'error': 'css_too_large'}), 400
+
+    acct = _get_kernel_account()
+    if not acct:
+        return jsonify({'error': 'kernel_not_authenticated'}), 401
+
+    if mode != 'permanent' or not acct.linked_user_id:
+        row = KernelCss.query.filter_by(page_key=page_key, kernel_account_id=acct.id, user_id=None).first()
+        if row:
+            row.css_text = css_text
+            row.updated_at = _utcnow()
+        else:
+            row = KernelCss(page_key=page_key, css_text=css_text, kernel_account_id=acct.id)
+            db.session.add(row)
+        db.session.commit()
+        return jsonify({'ok': True, 'saved': 'local'})
+
+    row = KernelCss.query.filter_by(page_key=page_key, user_id=int(acct.linked_user_id)).first()
+    if row:
+        row.css_text = css_text
+        row.updated_at = _utcnow()
+    else:
+        row = KernelCss(page_key=page_key, css_text=css_text, user_id=int(acct.linked_user_id))
+        db.session.add(row)
+    db.session.commit()
+    return jsonify({'ok': True, 'saved': 'permanent'})
+
+
 @app.route('/api/users/<string:username>/public', methods=['GET'])
 def api_user_public(username: str):
     me = _get_me()
@@ -4354,6 +4888,115 @@ def support():
     )
 
     return render_template('support.html', me=me, tickets=tickets, ok=ok, error=error)
+
+
+def _render_app_support(app_label: str, app_key: str, back_url: str):
+    ok = None
+    error = None
+
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip()
+        email = _normalize_email(request.form.get('email') or '')
+        category = (request.form.get('category') or 'general').strip().lower()
+        subject = (request.form.get('subject') or '').strip()
+        message = (request.form.get('message') or '').strip()
+
+        if not name or not email or not subject or not message:
+            error = 'Please fill all required fields.'
+        elif len(subject) > 80:
+            error = 'Subject is too long.'
+        elif len(message) > 1200:
+            error = 'Message is too long.'
+        else:
+            ok = 'Thanks. Your support request is recorded.'
+
+    return render_template(
+        'app_support.html',
+        app_label=app_label,
+        app_key=app_key,
+        back_url=back_url,
+        ok=ok,
+        error=error,
+    )
+
+
+def _render_app_feedback(app_label: str, app_key: str, back_url: str):
+    ok = None
+    error = None
+
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip()
+        email = _normalize_email(request.form.get('email') or '')
+        rating = (request.form.get('rating') or '').strip()
+        message = (request.form.get('message') or '').strip()
+
+        if not name or not email or not message:
+            error = 'Please fill all required fields.'
+        elif len(message) > 1200:
+            error = 'Message is too long.'
+        elif rating and rating not in {'1', '2', '3', '4', '5'}:
+            error = 'Invalid rating.'
+        else:
+            ok = 'Thanks. Your feedback is recorded.'
+
+    return render_template(
+        'app_feedback.html',
+        app_label=app_label,
+        app_key=app_key,
+        back_url=back_url,
+        ok=ok,
+        error=error,
+    )
+
+
+@app.route('/void/support', methods=['GET', 'POST'])
+def void_support():
+    return _render_app_support('Void', 'void', url_for('void_hub'))
+
+
+@app.route('/void/feedback', methods=['GET', 'POST'])
+def void_feedback():
+    return _render_app_feedback('Void', 'void', url_for('void_hub'))
+
+
+@app.route('/linkup/support', methods=['GET', 'POST'])
+def linkup_support():
+    return support()
+
+
+@app.route('/linkup/feedback', methods=['GET', 'POST'])
+def linkup_feedback():
+    return _render_app_feedback('LinkUp', 'linkup', url_for('chats'))
+
+
+@app.route('/secure/support', methods=['GET', 'POST'])
+def secure_support():
+    return _render_app_support('Secure', 'secure', url_for('linkup_secure.home'))
+
+
+@app.route('/secure/feedback', methods=['GET', 'POST'])
+def secure_feedback():
+    return _render_app_feedback('Secure', 'secure', url_for('linkup_secure.home'))
+
+
+@app.route('/kernel/support', methods=['GET', 'POST'])
+def kernel_support():
+    return _render_app_support('Kernel', 'kernel', url_for('kernel_page'))
+
+
+@app.route('/kernel/feedback', methods=['GET', 'POST'])
+def kernel_feedback():
+    return _render_app_feedback('Kernel', 'kernel', url_for('kernel_page'))
+
+
+@app.route('/creator/support', methods=['GET', 'POST'])
+def creator_support():
+    return _render_app_support('Creator', 'creator', url_for('creator_studio'))
+
+
+@app.route('/creator/feedback', methods=['GET', 'POST'])
+def creator_feedback():
+    return _render_app_feedback('Creator', 'creator', url_for('creator_studio'))
 
 
 @app.route('/api/contacts/accept', methods=['POST'])
@@ -5156,6 +5799,19 @@ You can ask me for the tour again anytime by typing /tour."
     return jsonify({'ok': True, 'id': msg.id})
 
 
+@app.route('/api/nova/guest', methods=['POST'])
+def api_nova_guest():
+    payload = request.get_json(silent=True) or {}
+    user_text = (payload.get('content') or '').strip()
+    if not user_text:
+        return jsonify({'error': 'empty_message'}), 400
+    if len(user_text) > 1200:
+        return jsonify({'error': 'message_too_long'}), 400
+
+    reply_text = _nova_guest_reply(user_text)
+    return jsonify({'ok': True, 'reply': reply_text})
+
+
 @app.route('/api/messages/<string:other_username>/attachment', methods=['POST'])
 def api_send_attachment(other_username: str):
     me = _get_me()
@@ -5854,6 +6510,12 @@ def logout():
     session.clear()
     return redirect(url_for('front'))
 
+
+
+@app.route('/kernel')
+def kernel_page():
+    me = _get_me()
+    return render_template('kernel.html', me=me)
 
 
 # ------------------ RUN ------------------

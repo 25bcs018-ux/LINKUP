@@ -1,0 +1,53 @@
+<!-- NOVA floating chat widget -->
+<button class="nova-fab" id="novaFab" type="button" aria-label="Chat with NOVA">
+  <span class="nova-label" aria-hidden="true">NOVA</span>
+  <span class="nova-logo" aria-hidden="true">
+    <span class="nova-ai" aria-hidden="true"></span>
+    <span class="nova-face" aria-hidden="true">
+      <span class="eye eye-left"></span>
+      <span class="eye eye-right"></span>
+      <span class="mouth"></span>
+    </span>
+  </span>
+  <span class="nova-tip" aria-hidden="true">Chat with NOVA</span>
+</button>
+<span class="nova-fab-home" id="novaFabHome" aria-hidden="true"></span>
+
+<section class="nova-panel" id="novaPanel" aria-label="NOVA chat" aria-hidden="true">
+  <header class="nova-hd">
+    <div class="left">
+      <span class="nova-badge" aria-hidden="true">
+        <span class="nova-ai" aria-hidden="true"></span>
+      </span>
+      <div class="meta">
+        <strong>NOVA</strong>
+        <span>Buddy assistant</span>
+      </div>
+    </div>
+    <button class="nova-close" id="novaClose" type="button" aria-label="Close NOVA">x</button>
+  </header>
+  <div class="nova-body" id="novaBody">
+    <div class="nova-hero" id="novaHero">
+      <div class="nova-hero-img" aria-hidden="true"><span class="nova-ai" aria-hidden="true"></span></div>
+      <div class="nova-hero-txt">
+        <div class="nova-hero-row">
+          <span class="nova-hero-badge" aria-hidden="true">NOVA</span>
+          <span class="nova-hero-hint" id="novaHeroHint" aria-hidden="true">Type /tour anytime</span>
+        </div>
+        <div class="nova-hero-title" id="novaHeroTitle">Hi, I'm NOVA</div>
+        <div class="nova-hero-sub" id="novaHeroSub">Your LinkUp buddy - ask me anything and I will jump in.</div>
+        <div class="nova-chips" id="novaChips">
+          <button class="nova-chip" type="button" data-nova-chip="Give me a quick tour">Quick tour</button>
+          <button class="nova-chip" type="button" data-nova-chip="Summarize this chat">Summarize</button>
+          <button class="nova-chip" type="button" data-nova-chip="Open LinkUp Secure">LinkUp Secure</button>
+          <button class="nova-chip" type="button" data-nova-chip="Open Creator">Creator</button>
+        </div>
+      </div>
+    </div>
+    <div class="nova-messages" id="novaMessages"></div>
+  </div>
+  <form class="nova-composer" id="novaComposer" autocomplete="off">
+    <input class="nova-input" id="novaInput" placeholder="Message NOVA..." />
+    <button class="nova-send" type="submit">Send</button>
+  </form>
+</section>

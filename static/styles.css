@@ -111,8 +111,8 @@ a{color:inherit;text-decoration:none}
 .brand{display:flex;align-items:center;gap:10px;font-weight:850;letter-spacing:.2px}
 .logo{
   width:36px;height:36px;border-radius:12px;
-  background:
-    url('linkup_logo.svg') center/cover no-repeat,
+    background:
+      url('linkup_logo.svg') center/cover no-repeat,
     radial-gradient(14px 14px at 30% 30%, rgba(255,255,255,.65), transparent 55%),
     linear-gradient(135deg,var(--accent),var(--accent3));
   box-shadow:0 10px 30px rgba(255,45,149,.18);

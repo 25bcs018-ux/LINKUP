@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>LinkUp Secure Chat</title>
+    <title>Secure Chat</title>
     <meta name="csrf-token" content="{{ csrf_token }}" />
-    <meta name="description" content="Temporary secure chat workspace for LinkUp Secure." />
+    <meta name="description" content="Temporary secure chat workspace for Secure." />
     <meta name="theme-color" content="#06131a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="LinkUp Secure" />
+    <meta name="apple-mobile-web-app-title" content="Secure" />
     <link rel="manifest" href="{{ url_for('linkup_secure.secure_manifest') }}" />
-    <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+    <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
     <link rel="stylesheet" href="{{ url_for('linkup_secure.static', filename='secure.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
     <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body>
+<body data-nova-context="secure">
     <div class="qw-shell" data-token="{{ token }}">
         <section class="qw-chat-card" aria-label="Temporary secure chat">
             <header class="qw-header">
@@ -78,6 +79,9 @@
         </div>
     </div>
 
+    {% include "partials/nova_widget.html" %}
+    <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
     <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
 
     <script>

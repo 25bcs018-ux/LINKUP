@@ -1,0 +1,1 @@
+Place new default images (avatars, backgrounds, stickers, banners, etc.) here for LinkUp Creator Studio. Add SVG, PNG, JPG, or GIF files as needed. This folder is for expansion and easy management of default creative assets.
