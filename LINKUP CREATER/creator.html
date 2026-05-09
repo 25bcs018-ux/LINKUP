@@ -4,12 +4,44 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="csrf-token" content="{{ csrf_token }}" />
-  <title>LinkUp Creator Studio</title>
+  <title>Creator Studio</title>
   <link rel="stylesheet" href="/creator/creator.css" />
 </head>
 <body>
+
   <div class="aurora"></div>
   <div class="grid-noise"></div>
+
+  <!-- Sidebar Navigation -->
+  <nav class="studio-sidebar" id="studioSidebar">
+    <div class="sidebar-brand">
+      <svg class="sidebar-logo" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#62e6d9" opacity="0.18"/><text x="32" y="40" text-anchor="middle" font-size="28" fill="#62e6d9" font-family="Oxanium, Space Grotesk, sans-serif">L</text></svg>
+      <span>Creator Studio</span>
+    </div>
+    <ul class="sidebar-nav">
+      <li><button class="sidebar-btn" id="navLibrarySidebar"><span>📚</span> Library</button></li>
+      <li><button class="sidebar-btn" id="navDraftsSidebar"><span>📝</span> Drafts</button></li>
+      <li><button class="sidebar-btn" id="navCaptureSidebar"><span>📷</span> Capture</button></li>
+      <li><button class="sidebar-btn" id="navExportSidebar"><span>⬇️</span> Export</button></li>
+      <li><button class="sidebar-btn" id="navSettingsSidebar"><span>⚙️</span> Settings</button></li>
+    </ul>
+    <div class="sidebar-footer">
+      <button class="sidebar-btn" id="themeToggleBtn"><span>🌓</span> Theme</button>
+    </div>
+  </nav>
+
+  <!-- Floating Add Asset Button -->
+  <button class="fab" id="fabAddAsset" title="Add Asset">+</button>
+
+  <!-- Top-right Profile/Settings -->
+  <div class="studio-profile-menu" id="profileMenu">
+    <button class="profile-btn" id="profileBtn" title="Profile">👤</button>
+    <div class="profile-dropdown" id="profileDropdown">
+      <button id="profileSettingsBtn">Settings</button>
+      <button id="profileFeedbackBtn">Feedback</button>
+      <button id="profileLogoutBtn">Logout</button>
+    </div>
+  </div>
 
   <header class="topbar">
     <div class="brand">
@@ -30,11 +62,12 @@
         </svg>
       </div>
       <div>
-        <div class="brand-name">LinkUp Creator</div>
+        <div class="brand-name">Creator</div>
         <div class="brand-sub">Studio deck</div>
       </div>
     </div>
     <nav class="top-actions">
+      <a class="ghost nav-link" href="{{ url_for('void_sso', app='creator') }}">Login with VOID</a>
       <a class="ghost nav-link decorated" id="navLibraryBtn" href="#libraryModal">Library</a>
       <button class="ghost" id="navDraftsBtn">Drafts</button>
       <button class="primary" id="navCaptureBtn">Launch Capture</button>
@@ -42,6 +75,21 @@
   </header>
 
   <main class="shell">
+    <!-- Pro Panels -->
+    <div class="pro-panels">
+      <div class="pro-panel" id="historyPanel">
+        <div class="pro-panel-title">History <span class="panel-hotkey">Ctrl+Z/Y</span></div>
+        <div class="pro-panel-body" id="historyList">No actions yet.</div>
+      </div>
+      <div class="pro-panel" id="previewPanel">
+        <div class="pro-panel-title">Preview <span class="panel-hotkey">Tab</span></div>
+        <div class="pro-panel-body" id="previewToggle">Before/After toggle coming soon.</div>
+      </div>
+      <div class="pro-panel" id="frameInspectorPanel">
+        <div class="pro-panel-title">Frame Inspector</div>
+        <div class="pro-panel-body" id="frameInspectorBody">Select a frame to inspect details.</div>
+      </div>
+    </div>
     <section class="hero">
       <div class="hero-copy">
         <span class="chip">Creator link stable</span>
@@ -103,6 +151,15 @@
         </div>
 
         <div class="rail-card">
+          <div class="rail-title">Frame Presets</div>
+          <div class="preset-grid">
+            <button class="preset-btn" type="button" data-preset="starter">Starter Loop</button>
+            <button class="preset-btn" type="button" data-preset="pulse">Pulse 6</button>
+            <button class="preset-btn" type="button" data-preset="sticker">Sticker Pop</button>
+          </div>
+        </div>
+
+        <div class="rail-card">
           <div class="rail-title">Frame Stack</div>
           <div class="frame-list" id="frameList"></div>
           <div class="frame-actions">
@@ -131,6 +188,30 @@
               <div class="canvas-overlay" id="canvasOverlay">Drop assets or pick a sample.</div>
             </div>
             <div class="controls">
+              <div class="control-group">
+                <label>Quick edits</label>
+                <div class="inline-control quick-actions">
+                  <button class="ghost" id="resetEditsBtn" type="button">Reset</button>
+                  <button class="ghost" id="centerEditsBtn" type="button">Center</button>
+                  <button class="ghost" id="fitCoverBtn" type="button">Fit cover</button>
+                  <button class="ghost" id="fitContainBtn" type="button">Fit contain</button>
+                </div>
+              </div>
+              <div class="control-group">
+                <label>Filter</label>
+                <select id="filterSelect">
+                  <option value="none">None</option>
+                  <option value="grayscale">Grayscale</option>
+                  <option value="sepia">Sepia</option>
+                  <option value="invert">Invert</option>
+                  <option value="brightness">Brightness</option>
+                  <option value="contrast">Contrast</option>
+                </select>
+              </div>
+              <div class="control-group" id="filterIntensityGroup" style="display:none">
+                <label>Filter Intensity</label>
+                <input type="range" id="filterIntensityRange" min="0" max="200" value="100" />
+              </div>
               <div class="control-group">
                 <label>Size</label>
                 <input type="range" id="sizeRange" min="160" max="640" value="320" />
@@ -161,6 +242,17 @@
               <div class="control-group">
                 <label>Rotate</label>
                 <input type="range" id="rotateRange" min="-20" max="20" value="0" />
+              </div>
+              <div class="control-group">
+                <label>Opacity</label>
+                <input type="range" id="opacityRange" min="10" max="100" value="100" />
+              </div>
+              <div class="control-group">
+                <label>Flip</label>
+                <div class="inline-control">
+                  <label class="checkline"><input type="checkbox" id="flipXToggle" /> Flip X</label>
+                  <label class="checkline"><input type="checkbox" id="flipYToggle" /> Flip Y</label>
+                </div>
               </div>
               <div class="control-group">
                 <label>Fit</label>
@@ -313,6 +405,45 @@
     <div class="library-list" id="libraryList"></div>
   </section>
   <div class="modal-scrim" id="libraryScrim" aria-hidden="true"></div>
+
+  <section class="modal" id="settingsModal" aria-hidden="true" aria-label="Creator settings">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Creator Settings</div>
+        <div class="modal-sub">Defaults for new frames and exports.</div>
+      </div>
+      <button class="ghost nav-link" id="settingsCloseBtn" type="button">Close</button>
+    </div>
+    <form class="settings-grid" id="settingsForm">
+      <label class="control-group">
+        <span>Default size</span>
+        <input type="number" id="settingsSize" min="160" max="640" value="320" />
+      </label>
+      <label class="control-group">
+        <span>Default delay (ms)</span>
+        <input type="number" id="settingsDelay" min="60" max="1000" value="120" />
+      </label>
+      <label class="control-group">
+        <span>Default fit</span>
+        <select id="settingsFit">
+          <option value="cover">Cover</option>
+          <option value="contain">Contain</option>
+        </select>
+      </label>
+      <label class="control-group">
+        <span>Default background</span>
+        <input type="color" id="settingsBg" value="#081c22" />
+      </label>
+      <label class="control-group">
+        <span>Auto-play preview</span>
+        <label class="checkline"><input type="checkbox" id="settingsAutoplay" /> Enable</label>
+      </label>
+      <div class="settings-actions">
+        <button class="primary" id="settingsSaveBtn" type="submit">Save settings</button>
+      </div>
+    </form>
+  </section>
+  <div class="modal-scrim" id="settingsScrim" aria-hidden="true"></div>
 
   <div class="tour-scrim" id="tourScrim" aria-hidden="true"></div>
   <div class="tour-card" id="tourCard" aria-hidden="true">

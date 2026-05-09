@@ -7,9 +7,10 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <meta name="theme-color" content="#0b1220" />
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
   <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body class="bg-animated" data-username="{{ (username or '')|e }}" data-login-url="{{ url_for('login') }}" data-resend-url="{{ url_for('api_email_verify_otp_resend') }}" data-verify-url="{{ url_for('api_email_verify_otp_confirm') }}" data-dev-code="{{ (dev_code or '')|e }}">
+<body class="bg-animated" data-username="{{ (username or '')|e }}" data-login-url="{{ url_for('login') }}" data-resend-url="{{ url_for('api_email_verify_otp_resend') }}" data-verify-url="{{ url_for('api_email_verify_otp_confirm') }}" data-dev-code="{{ (dev_code or '')|e }}" data-nova-context="verify">
   <div class="auth-page">
     <div class="auth-shell">
       <section class="auth-hero" aria-label="Verify email">
@@ -54,6 +55,9 @@
     </div>
   </div>
 
+  {% include "partials/nova_widget.html" %}
+  <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
   <script>
     const themeUser = document.body?.dataset?.username;
     if (themeUser && window.LinkupTheme?.setUserId) {

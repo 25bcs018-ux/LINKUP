@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VOID • Access</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='void_auth.css') }}" />
+</head>
+<body data-void-tab="{{ void_tab|default('signin') }}">
+  <div class="void-bg" aria-hidden="true">
+    <div class="void-noise"></div>
+    <div class="void-moon"></div>
+    <div class="void-craters"></div>
+    <div class="void-branches"></div>
+    <div class="void-pulse"></div>
+    <div class="void-vignette"></div>
+  </div>
+
+  <main class="void-auth" role="main">
+    <div class="void-brand">
+      <img src="{{ url_for('static', filename='brand/void-logo.png') }}" alt="Void logo" class="void-logo" />
+      <h1 class="void-title">VOID</h1>
+    </div>
+
+    <section class="void-card" aria-labelledby="voidAccessTitle">
+      <div class="void-tabs" role="tablist">
+        <button class="void-tab {% if void_tab|default('signin') == 'signin' %}active{% endif %}" type="button" id="tabSignIn" data-tab="signin" role="tab" aria-selected="{{ 'true' if void_tab|default('signin') == 'signin' else 'false' }}">Sign in</button>
+        <button class="void-tab {% if void_tab|default('signin') == 'create' %}active{% endif %}" type="button" id="tabCreate" data-tab="create" role="tab" aria-selected="{{ 'true' if void_tab|default('signin') == 'create' else 'false' }}">Create</button>
+      </div>
+
+      <div class="void-panels">
+        <div class="void-panel {% if void_tab|default('signin') == 'create' %}hidden{% endif %}" id="panelSignIn" role="tabpanel" aria-labelledby="tabSignIn">
+          <h2 id="voidAccessTitle">Access VOID</h2>
+          <p class="void-sub">Enter your credentials to reach the hub.</p>
+          {% if created %}
+            <div class="void-notice">Account created. Sign in to continue.</div>
+          {% endif %}
+          {% if void_error and void_tab|default('signin') == 'signin' %}
+            <div class="void-notice error">{{ void_error }}</div>
+          {% endif %}
+
+          <form action="{{ url_for('void_login') }}" method="POST" class="void-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            {% if next_app %}
+              <input type="hidden" name="next" value="{{ next_app }}" />
+            {% endif %}
+            <label class="void-field">
+              <span>Username or email</span>
+              <input type="text" name="username" autocomplete="username" required maxlength="120" minlength="3" placeholder="yourname or you@example.com" value="{{ prefill_username|default('')|e }}" />
+            </label>
+            <label class="void-field">
+              <span>Password</span>
+              <input type="password" name="password" autocomplete="current-password" required maxlength="80" minlength="5" placeholder="••••••••" />
+            </label>
+            <div class="void-actions">
+              <button class="void-btn primary" type="submit">Sign in</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="void-panel {% if void_tab|default('signin') != 'create' %}hidden{% endif %}" id="panelCreate" role="tabpanel" aria-labelledby="tabCreate">
+          <h2>Create VOID access</h2>
+          <p class="void-sub">Create a new identity to join the hub.</p>
+          {% if void_error and void_tab|default('signin') == 'create' %}
+            <div class="void-notice error">{{ void_error }}</div>
+          {% endif %}
+
+          <form action="{{ url_for('void_register') }}" method="POST" class="void-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            {% if next_app %}
+              <input type="hidden" name="next" value="{{ next_app }}" />
+            {% endif %}
+            <label class="void-field">
+              <span>Name (username)</span>
+              <input type="text" name="username" required maxlength="15" minlength="3" placeholder="yourname" value="{{ prefill_username|default('')|e }}" />
+            </label>
+            <label class="void-field">
+              <span>Email</span>
+              <input type="email" name="email" required placeholder="you@example.com" value="{{ prefill_email|default('')|e }}" />
+            </label>
+            <label class="void-field">
+              <span>Password</span>
+              <input type="password" name="password" required minlength="5" placeholder="Create a password" />
+            </label>
+            <label class="void-field">
+              <span>Confirm password</span>
+              <input type="password" name="confirm_password" required minlength="5" placeholder="Repeat password" />
+            </label>
+
+            <div class="void-legal">
+              <label class="void-check">
+                <input type="checkbox" name="accept_terms" required />
+                <span>
+                  I agree to the <a href="{{ url_for('void_terms') }}" target="_blank" rel="noopener">Terms &amp; Conditions</a>
+                  and <a href="{{ url_for('void_privacy') }}" target="_blank" rel="noopener">Privacy Policy</a>.
+                </span>
+              </label>
+            </div>
+
+            <div class="void-actions">
+              <button class="void-btn primary" type="submit">Create account</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='void_auth.js') }}" defer></script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 {
-  "name": "LinkUp",
-  "short_name": "LinkUp",
-  "description": "LinkUp chat app for mobile and desktop browsers.",
+  "name": "Void",
+  "short_name": "Void",
+  "description": "Void hub covering LinkUp apps.",
   "start_url": "/chats",
   "scope": "/",
   "display": "standalone",
@@ -10,9 +10,9 @@
   "theme_color": "#111b21",
   "icons": [
     {
-      "src": "/static/linkup_logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/static/brand/void-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

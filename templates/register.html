@@ -11,11 +11,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="LinkUp" />
     <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
-    <link rel="icon" href="{{ url_for('static', filename='linkup_logo.svg') }}" type="image/svg+xml" />
+    <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
     <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body class="bg-animated">
+<body class="bg-animated" data-nova-context="auth">
     <div class="auth-page">
         <div class="auth-shell">
             <section class="auth-hero" aria-label="Create account">
@@ -92,13 +93,23 @@
                     </div>
                 </form>
 
+                <div style="margin-top: 14px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <a class="btn ghost" href="{{ url_for('void_sso', app='linkup') }}" style="text-decoration:none;">Login with VOID</a>
+                </div>
+
                 <div class="small-links">
                     Already have an account? <a href="{{ url_for('login_page') }}">Sign in</a>
+                    <span style="opacity:0.6; margin: 0 8px;">•</span>
+                    <a href="{{ url_for('void_sso', app='linkup') }}">Login with VOID</a>
                 </div>
             </section>
         </div>
     </div>
 
+    {% include "partials/nova_widget.html" %}
+    <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='kernel_runtime.js') }}"></script>
     <script src="{{ url_for('static', filename='register_suggest.js') }}"></script>
     <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
 </body>

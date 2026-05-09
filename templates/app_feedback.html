@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ app_label }} • Feedback</title>
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="{{ app_label }}" />
+  <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='support.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
+  <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body class="bg-animated" data-nova-context="support" data-app="{{ app_key }}">
+  <div class="support-page">
+    <div class="support-shell">
+      <header class="support-top">
+        <a class="brand" href="{{ back_url }}" aria-label="Back">
+          <span class="logo" aria-hidden="true"></span>
+          <span>{{ app_label | upper }}</span>
+        </a>
+        <div class="top-actions">
+          <a class="btn" href="{{ back_url }}">Back</a>
+        </div>
+      </header>
+
+      <main class="support-grid">
+        <section class="card">
+          <h1>{{ app_label }} Feedback</h1>
+          <p class="muted">Tell us what you want next and what needs attention.</p>
+
+          <div class="faq">
+            <details open>
+              <summary>What should I include?</summary>
+              <p>Feature requests, bugs, or UI improvements that would help your workflow.</p>
+            </details>
+            <details>
+              <summary>Can I report a critical issue?</summary>
+              <p>Yes. Use the message box and mark the rating to help us prioritize.</p>
+            </details>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Send feedback</h2>
+          <p class="muted">Every note helps us improve {{ app_label }}.</p>
+
+          {% if ok %}
+            <div class="notice ok">{{ ok }}</div>
+          {% endif %}
+          {% if error %}
+            <div class="notice error">{{ error }}</div>
+          {% endif %}
+
+          <form method="POST" class="support-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <div class="field">
+              <label class="label" for="name">Name</label>
+              <input class="input" id="name" name="name" maxlength="80" required placeholder="Your name" />
+            </div>
+
+            <div class="field">
+              <label class="label" for="email">Email</label>
+              <input class="input" id="email" name="email" type="email" maxlength="120" required placeholder="you@example.com" />
+            </div>
+
+            <div class="field">
+              <label class="label" for="rating">Rating</label>
+              <select class="input" id="rating" name="rating">
+                <option value="">Choose</option>
+                <option value="5">5 - Love it</option>
+                <option value="4">4 - Solid</option>
+                <option value="3">3 - Okay</option>
+                <option value="2">2 - Needs work</option>
+                <option value="1">1 - Broken</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label class="label" for="message">Message</label>
+              <textarea class="input textarea" id="message" name="message" maxlength="1200" required placeholder="Share your feedback..."></textarea>
+            </div>
+
+            <div class="actions">
+              <button class="btn green" type="submit">Send feedback</button>
+              <a class="btn" href="{{ back_url }}">Back</a>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+  </div>
+  {% include "partials/nova_widget.html" %}
+  <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='kernel_runtime.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+</body>
+</html>

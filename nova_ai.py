@@ -17,6 +17,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
 def _provider() -> str:
     # openai: OpenAI Chat Completions via REST
     # ollama: local Ollama server (http://localhost:11434)
+    # gemini: Google Gemini API via REST
     # http: custom HTTP inference endpoint
     # python: custom local Python module hook
     # local: no external calls
@@ -270,6 +271,8 @@ def generate_reply(
 
     if provider == "openai":
         return _sanitize_reply(_openai_reply(me_username=me_username, user_text=clean_user_text, history=clean_history))
+    if provider == "gemini":
+        return _sanitize_reply(_gemini_reply(me_username=me_username, user_text=clean_user_text, history=clean_history))
     if provider == "ollama":
         return _sanitize_reply(_ollama_reply(me_username=me_username, user_text=clean_user_text, history=clean_history))
     if provider == "http":
@@ -364,6 +367,48 @@ def _custom_python_reply(*, me_username: str, user_text: str, history: List[Dict
         if isinstance(out, dict):
             out = out.get("reply") or out.get("content") or ""
         return _normalize_reply_text(str(out or ""))
+    except Exception:
+        return ""
+
+
+def _gemini_reply(*, me_username: str, user_text: str, history: List[Dict[str, str]]) -> str:
+    api_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
+    if not api_key:
+        return ""
+
+    model = (os.environ.get("GEMINI_MODEL") or "gemini-1.5-flash").strip()
+    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+    contents: List[Dict[str, Any]] = []
+    for item in history:
+        role = "user" if item.get("role") == "user" else "model"
+        content = (item.get("content") or "").strip()
+        if not content:
+            continue
+        contents.append({"role": role, "parts": [{"text": content}]})
+
+    contents.append({"role": "user", "parts": [{"text": user_text}]})
+
+    payload: Dict[str, Any] = {
+        "system_instruction": {"parts": [{"text": _system_prompt()}]},
+        "contents": contents,
+        "generationConfig": {
+            "temperature": float(os.environ.get("GEMINI_TEMPERATURE", "0.4") or "0.4"),
+            "maxOutputTokens": int(os.environ.get("GEMINI_MAX_TOKENS", "220") or "220"),
+        },
+    }
+
+    try:
+        r = requests.post(endpoint, params={"key": api_key}, json=payload, timeout=20)
+        if r.status_code >= 400:
+            return ""
+        data = r.json()
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return ""
+        parts = (candidates[0].get("content") or {}).get("parts") or []
+        text = "".join(p.get("text") or "" for p in parts).strip()
+        return _normalize_reply_text(text)
     except Exception:
         return ""
 

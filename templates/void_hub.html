@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VOID • Hub</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='void_hub.css') }}" />
+</head>
+<body data-void-username="{{ void_user.username if void_user else '' }}"
+  data-void-email="{{ void_user.email if void_user else '' }}"
+  data-void-id="{{ void_user.id if void_user else '' }}"
+  data-void-created="{{ void_user.created_at.isoformat() if void_user else '' }}">
+  <div class="void-bg" aria-hidden="true">
+    <div class="void-noise"></div>
+    <div class="void-moon"></div>
+    <div class="void-craters"></div>
+    <div class="void-branches"></div>
+    <div class="void-vignette"></div>
+  </div>
+
+  <main class="void-hub" role="main">
+    <header class="void-head">
+      <div class="void-brand">
+        <img src="{{ url_for('static', filename='brand/void-logo.png') }}" alt="Void logo" class="void-logo" />
+        <div>
+          <h1 class="void-title">VOID</h1>
+          <p class="void-sub">Central hub. Choose an experience to enter.</p>
+        </div>
+      </div>
+
+      <button class="void-account" id="voidAccountBtn" type="button" aria-label="Account">
+        <div class="void-avatar" aria-hidden="true">
+          <span class="void-avatar-ring"></span>
+          <span class="void-avatar-core"></span>
+        </div>
+        <div class="void-account-meta">
+          <span class="void-account-label">Account</span>
+          <span class="void-account-name">VOID Profile</span>
+        </div>
+      </button>
+    </header>
+
+    <aside class="account-drawer" id="voidAccountDrawer" aria-hidden="true">
+      <div class="account-drawer-head">
+        <div>
+          <div class="drawer-title">VOID Account</div>
+          <div class="drawer-sub">Manage your profile and usage.</div>
+        </div>
+        <button class="ghost" id="voidAccountClose" type="button">Close</button>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title">Account settings</div>
+        <div class="drawer-grid">
+          <div class="drawer-field">
+            <span>Void ID</span>
+            <strong id="voidAccountId">--</strong>
+          </div>
+          <div class="drawer-field">
+            <span>Username</span>
+            <strong id="voidAccountName">--</strong>
+          </div>
+          <div class="drawer-field">
+            <span>Email</span>
+            <strong id="voidAccountEmail">--</strong>
+          </div>
+          <div class="drawer-field">
+            <span>Joined</span>
+            <strong id="voidAccountCreated">--</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title">Void app access</div>
+        <div class="drawer-usage">
+          <div class="drawer-field">
+            <span>Apps used with Void ID</span>
+            <strong id="voidAppsCount">0</strong>
+          </div>
+          <div class="usage-list">
+            <div class="usage-row"><span>LinkUp</span><strong id="voidUsageLinkup">0</strong></div>
+            <div class="usage-row"><span>Secure</span><strong id="voidUsageSecure">0</strong></div>
+            <div class="usage-row"><span>Kernel</span><strong id="voidUsageKernel">0</strong></div>
+            <div class="usage-row"><span>Creator</span><strong id="voidUsageCreator">0</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-actions">
+        <a class="ghost" href="{{ url_for('void_feedback') }}">Feedback</a>
+        <a class="ghost" href="{{ url_for('void_support') }}">Support</a>
+        <a class="ghost" href="{{ url_for('void_logout') }}">Sign out</a>
+      </div>
+    </aside>
+    <div class="account-scrim" id="voidAccountScrim" aria-hidden="true"></div>
+
+    <section class="void-apps" aria-label="Applications">
+      <div class="app-tabs" role="tablist" aria-label="Apps">
+        <button class="app-tab is-active" type="button" role="tab" aria-selected="true"
+                data-app="linkup" data-title="LinkUp" data-desc="Core messaging and presence."
+          data-href="{{ url_for('front') }}" style="--delay: 0ms;">
+          <span class="app-logo">
+            <img src="{{ url_for('static', filename='linkup_logo.svg') }}" alt="LinkUp" />
+          </span>
+          <span class="app-name">
+            LinkUp
+            <span class="app-tag">Beta</span>
+          </span>
+        </button>
+
+        <button class="app-tab" type="button" role="tab" aria-selected="false"
+          data-app="secure" data-title="Secure" data-desc="Private vaults and sealed chats."
+          data-href="{{ url_for('linkup_secure.home') }}" style="--delay: 120ms;">
+          <span class="app-logo secure-logo" aria-hidden="true"></span>
+          <span class="app-name">
+            Secure
+            <span class="app-tag">Beta</span>
+          </span>
+        </button>
+
+        <button class="app-tab" type="button" role="tab" aria-selected="false"
+                data-app="kernel" data-title="Kernel" data-desc="Systems control and operator tools."
+                data-href="/kernel" style="--delay: 240ms;">
+          <span class="app-logo kernel-logo" aria-hidden="true">
+            <span class="kernel-symbol-core">K</span>
+          </span>
+          <span class="app-name">
+            Kernel
+            <span class="app-tag">Beta</span>
+          </span>
+        </button>
+
+        <button class="app-tab" type="button" role="tab" aria-selected="false"
+                data-app="creator" data-title="Creator" data-desc="Design, media, and build tools."
+                data-href="{{ url_for('creator_studio') }}" style="--delay: 360ms;">
+          <span class="app-logo creator-logo" aria-hidden="true">
+            <svg viewBox="0 0 64 64" aria-hidden="true">
+              <circle cx="32" cy="32" r="28" fill="#62e6d9" opacity="0.18" />
+              <text x="32" y="40" text-anchor="middle" font-size="28" fill="#62e6d9" font-family="Oxanium, Space Grotesk, sans-serif">L</text>
+            </svg>
+          </span>
+          <span class="app-name">
+            Creator
+            <span class="app-tag">Beta</span>
+          </span>
+        </button>
+      </div>
+
+      <div class="app-panel" role="region" aria-live="polite">
+        <div class="app-panel-inner">
+          <h2 id="appTitle">LinkUp</h2>
+          <p id="appDesc">Core messaging and presence.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="void-games" aria-label="Games">
+      <div class="void-games-head">
+        <h2>Games</h2>
+        <p class="void-sub">Arcade space for Void-connected experiences.</p>
+      </div>
+      <div class="void-games-panel">
+        <span>Games</span>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='void_hub.js') }}" defer></script>
+</body>
+</html>

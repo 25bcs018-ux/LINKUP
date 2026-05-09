@@ -1,4 +1,101 @@
 (() => {
+    // --- Pro Sidebar, FAB, Theme Toggle, Profile Menu ---
+    window.addEventListener('DOMContentLoaded', () => {
+      // Sidebar navigation
+      const sidebarBtns = document.querySelectorAll('.sidebar-btn');
+      sidebarBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          sidebarBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          // Scroll to section or open modal as needed
+          if (btn.id === 'navLibrarySidebar') document.getElementById('libraryModal')?.classList.add('show');
+          if (btn.id === 'navDraftsSidebar') setStatus('Drafts coming soon.');
+          if (btn.id === 'navCaptureSidebar') document.getElementById('dropzone')?.scrollIntoView({behavior:'smooth'});
+          if (btn.id === 'navExportSidebar') setStatus('Export options below.');
+          if (btn.id === 'navSettingsSidebar') setStatus('Settings coming soon.');
+        });
+      });
+
+      // Floating Add Asset Button
+      const fab = document.getElementById('fabAddAsset');
+      if (fab) {
+        fab.addEventListener('click', () => {
+          document.getElementById('assetInput')?.click();
+        });
+      }
+
+      // Theme toggle
+      const themeBtn = document.getElementById('themeToggleBtn');
+      if (themeBtn) {
+        themeBtn.addEventListener('click', () => {
+          document.body.classList.toggle('theme-light');
+          localStorage.setItem('creatorTheme', document.body.classList.contains('theme-light') ? 'light' : 'dark');
+        });
+        // On load, set theme
+        if (localStorage.getItem('creatorTheme') === 'light') {
+          document.body.classList.add('theme-light');
+        }
+      }
+
+      // Profile menu dropdown
+      const profileBtn = document.getElementById('profileBtn');
+      const profileDropdown = document.getElementById('profileDropdown');
+      if (profileBtn && profileDropdown) {
+        profileBtn.addEventListener('click', () => {
+          profileDropdown.style.display = profileDropdown.style.display === 'block' ? 'none' : 'block';
+        });
+        document.addEventListener('click', (e) => {
+          if (!profileBtn.contains(e.target) && !profileDropdown.contains(e.target)) {
+            profileDropdown.style.display = 'none';
+          }
+        });
+      }
+      // Profile menu actions
+      document.getElementById('profileSettingsBtn')?.addEventListener('click', () => setStatus('Settings coming soon.'));
+      document.getElementById('profileFeedbackBtn')?.addEventListener('click', () => setStatus('Feedback coming soon.'));
+      document.getElementById('profileLogoutBtn')?.addEventListener('click', () => setStatus('Logout coming soon.'));
+    });
+
+    // --- Pro Panels: History, Preview, Inspector ---
+    // History stack for undo/redo
+    const historyStack = [];
+    let historyIndex = -1;
+    function pushHistory(action, payload) {
+      historyStack.splice(historyIndex + 1);
+      historyStack.push({ action, payload });
+      historyIndex = historyStack.length - 1;
+      renderHistory();
+    }
+    function undo() {
+      if (historyIndex > 0) {
+        historyIndex--;
+        // TODO: apply undo logic
+        renderHistory();
+      }
+    }
+    function redo() {
+      if (historyIndex < historyStack.length - 1) {
+        historyIndex++;
+        // TODO: apply redo logic
+        renderHistory();
+      }
+    }
+    function renderHistory() {
+      const list = document.getElementById('historyList');
+      if (!list) return;
+      if (historyStack.length === 0) {
+        list.textContent = 'No actions yet.';
+        return;
+      }
+      list.innerHTML = historyStack.map((h, i) => `<div${i===historyIndex?' style="color:var(--accent)"':''}>${h.action}</div>`).join('');
+    }
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
+      if (e.key === 'Tab') { e.preventDefault(); document.getElementById('previewPanel')?.scrollIntoView({behavior:'smooth'}); }
+    });
+    // TODO: Call pushHistory('Action', {details}) in all major mutating actions
   const sampleAssets = [
     { name: 'Nebula', url: '/creator/assets/nebula.svg' },
     { name: 'Prism', url: '/creator/assets/prism.svg' },
@@ -43,9 +140,40 @@
       removeBgTolerance: 26,
       cardTitle: '',
       cardLine: '',
-      accent: '#62e6d9'
+      accent: '#62e6d9',
+      filter: 'none',
+      filterIntensity: 100,
+      opacity: 1,
+      flipX: false,
+      flipY: false
     }
   };
+
+  // --- Filter UI bindings ---
+  window.addEventListener('DOMContentLoaded', () => {
+    const filterSelect = document.getElementById('filterSelect');
+    const filterIntensityRange = document.getElementById('filterIntensityRange');
+    const filterIntensityGroup = document.getElementById('filterIntensityGroup');
+
+    if (filterSelect) {
+      filterSelect.addEventListener('change', (e) => {
+        updateSetting('filter', e.target.value);
+        if (e.target.value === 'brightness' || e.target.value === 'contrast') {
+          filterIntensityGroup.style.display = '';
+        } else {
+          filterIntensityGroup.style.display = 'none';
+        }
+        drawPreview();
+      });
+    }
+    if (filterIntensityRange) {
+
+      filterIntensityRange.addEventListener('input', (e) => {
+        updateSetting('filterIntensity', Number(e.target.value || 100));
+        drawPreview();
+      });
+    }
+  });
 
   const els = {
     assetInput: document.getElementById('assetInput'),
@@ -70,10 +198,17 @@
     delayRange: document.getElementById('delayRange'),
     frameDelayInput: document.getElementById('frameDelayInput'),
     applyDelayAllBtn: document.getElementById('applyDelayAllBtn'),
+    resetEditsBtn: document.getElementById('resetEditsBtn'),
+    centerEditsBtn: document.getElementById('centerEditsBtn'),
+    fitCoverBtn: document.getElementById('fitCoverBtn'),
+    fitContainBtn: document.getElementById('fitContainBtn'),
     zoomRange: document.getElementById('zoomRange'),
     offsetXRange: document.getElementById('offsetXRange'),
     offsetYRange: document.getElementById('offsetYRange'),
     rotateRange: document.getElementById('rotateRange'),
+    opacityRange: document.getElementById('opacityRange'),
+    flipXToggle: document.getElementById('flipXToggle'),
+    flipYToggle: document.getElementById('flipYToggle'),
     fitSelect: document.getElementById('fitSelect'),
     captionInput: document.getElementById('captionInput'),
     captionXRange: document.getElementById('captionXRange'),
@@ -98,6 +233,19 @@
     libraryFilter: document.getElementById('libraryFilter'),
     libraryList: document.getElementById('libraryList'),
     libraryRefreshBtn: document.getElementById('libraryRefreshBtn'),
+    libraryModal: document.getElementById('libraryModal'),
+    libraryScrim: document.getElementById('libraryScrim'),
+    libraryCloseBtn: document.getElementById('libraryCloseBtn'),
+    settingsModal: document.getElementById('settingsModal'),
+    settingsScrim: document.getElementById('settingsScrim'),
+    settingsForm: document.getElementById('settingsForm'),
+    settingsSize: document.getElementById('settingsSize'),
+    settingsDelay: document.getElementById('settingsDelay'),
+    settingsFit: document.getElementById('settingsFit'),
+    settingsBg: document.getElementById('settingsBg'),
+    settingsAutoplay: document.getElementById('settingsAutoplay'),
+    settingsSaveBtn: document.getElementById('settingsSaveBtn'),
+    settingsCloseBtn: document.getElementById('settingsCloseBtn'),
     sendContactSelect: document.getElementById('sendContactSelect'),
     sendBtn: document.getElementById('sendBtn'),
     sendSelection: document.getElementById('sendSelection'),
@@ -158,6 +306,7 @@
   function addAsset(asset) {
     state.assets.push(asset);
     renderAssets();
+    return asset;
   }
 
   function loadImage(url) {
@@ -173,14 +322,64 @@
 
   function addAssetFromUrl(url, name) {
     return loadImage(url).then((img) => {
-      addAsset({ id: uid(), name: name || 'Asset', img, url });
+      return addAsset({ id: uid(), name: name || 'Asset', img, url });
     });
   }
 
   function addAssetFromFile(file) {
     const url = URL.createObjectURL(file);
     return loadImage(url).then((img) => {
-      addAsset({ id: uid(), name: file.name || 'Upload', img, url });
+      return addAsset({ id: uid(), name: file.name || 'Upload', img, url });
+    });
+  }
+
+  function ensureSampleAsset(sample) {
+    const existing = state.assets.find((asset) => asset.url === sample.url);
+    if (existing) return Promise.resolve(existing);
+    return addAssetFromUrl(sample.url, sample.name);
+  }
+
+  function applyPreset(presetKey) {
+    const presets = {
+      starter: {
+        label: 'Starter loop ready.',
+        mode: 'gif',
+        order: [0, 1, 2],
+        delay: 140
+      },
+      pulse: {
+        label: 'Pulse loop ready.',
+        mode: 'gif',
+        order: [0, 1, 2, 3, 2, 1],
+        delay: 110
+      },
+      sticker: {
+        label: 'Sticker pop ready.',
+        mode: 'sticker',
+        order: [1],
+        delay: 120
+      }
+    };
+
+    const preset = presets[presetKey];
+    if (!preset) return;
+
+    handleModeChange(preset.mode);
+    const targets = preset.order.map((index) => sampleAssets[index]).filter(Boolean);
+    Promise.all(targets.map(ensureSampleAsset)).then((assets) => {
+      state.frames = [];
+      state.activeFrameId = null;
+      assets.forEach((asset) => {
+        const frame = { id: uid(), assetId: asset.id, settings: makeFrameSettings() };
+        frame.settings.delay = preset.delay;
+        state.frames.push(frame);
+        state.activeFrameId = frame.id;
+      });
+      renderFrames();
+      drawPreview();
+      setStatus(preset.label);
+    }).catch(() => {
+      setStatus('Preset failed to load.');
     });
   }
 
@@ -218,7 +417,10 @@
       stickerTextY: state.settings.stickerTextY,
       removeBg: state.settings.removeBg,
       removeBgColor: state.settings.removeBgColor,
-      removeBgTolerance: state.settings.removeBgTolerance
+      removeBgTolerance: state.settings.removeBgTolerance,
+      opacity: state.settings.opacity,
+      flipX: state.settings.flipX,
+      flipY: state.settings.flipY
     };
   }
 
@@ -437,16 +639,78 @@
     }
   }
 
+  function applyQuickEdit(action) {
+    if (action === 'center') {
+      updateSetting('offsetX', 0);
+      updateSetting('offsetY', 0);
+      updateSetting('captionX', 0);
+      updateSetting('captionY', 0);
+      if (els.offsetXRange) els.offsetXRange.value = '0';
+      if (els.offsetYRange) els.offsetYRange.value = '0';
+      if (els.captionXRange) els.captionXRange.value = '0';
+      if (els.captionYRange) els.captionYRange.value = '0';
+      drawPreview();
+      return;
+    }
+
+    if (action === 'fit-cover' || action === 'fit-contain') {
+      const fit = action === 'fit-cover' ? 'cover' : 'contain';
+      updateSetting('fit', fit);
+      if (els.fitSelect) els.fitSelect.value = fit;
+      drawPreview();
+      return;
+    }
+
+    if (action === 'reset') {
+      updateSetting('zoom', 1);
+      updateSetting('offsetX', 0);
+      updateSetting('offsetY', 0);
+      updateSetting('rotate', 0);
+      updateSetting('opacity', 1);
+      updateSetting('flipX', false);
+      updateSetting('flipY', false);
+      updateSetting('captionX', 0);
+      updateSetting('captionY', 0);
+      updateSetting('fit', 'cover');
+      updateSetting('cropEnabled', false);
+      updateSetting('cropX', 50);
+      updateSetting('cropY', 50);
+      updateSetting('cropSize', 100);
+
+      if (els.zoomRange) els.zoomRange.value = '100';
+      if (els.offsetXRange) els.offsetXRange.value = '0';
+      if (els.offsetYRange) els.offsetYRange.value = '0';
+      if (els.rotateRange) els.rotateRange.value = '0';
+      if (els.opacityRange) els.opacityRange.value = '100';
+      if (els.flipXToggle) els.flipXToggle.checked = false;
+      if (els.flipYToggle) els.flipYToggle.checked = false;
+      if (els.captionXRange) els.captionXRange.value = '0';
+      if (els.captionYRange) els.captionYRange.value = '0';
+      if (els.fitSelect) els.fitSelect.value = 'cover';
+      if (els.cropToggle) els.cropToggle.checked = false;
+      if (els.cropXRange) els.cropXRange.value = '50';
+      if (els.cropYRange) els.cropYRange.value = '50';
+      if (els.cropSizeRange) els.cropSizeRange.value = '100';
+      drawPreview();
+    }
+  }
+
   function syncControlsFromFrame(frame) {
     const settings = getFrameSettings(frame);
+    if (els.sizeRange) els.sizeRange.value = String(state.settings.size || 320);
     if (els.frameDelayInput) els.frameDelayInput.value = String(settings.delay || state.settings.delay);
+    if (els.delayRange) els.delayRange.value = String(settings.delay || state.settings.delay);
     if (els.zoomRange) els.zoomRange.value = String((settings.zoom || 1) * 100);
     if (els.offsetXRange) els.offsetXRange.value = String(settings.offsetX || 0);
     if (els.offsetYRange) els.offsetYRange.value = String(settings.offsetY || 0);
     if (els.rotateRange) els.rotateRange.value = String(settings.rotate || 0);
+    if (els.opacityRange) els.opacityRange.value = String(Math.round((settings.opacity ?? 1) * 100));
+    if (els.flipXToggle) els.flipXToggle.checked = !!settings.flipX;
+    if (els.flipYToggle) els.flipYToggle.checked = !!settings.flipY;
     if (els.fitSelect) els.fitSelect.value = settings.fit || 'cover';
     if (els.captionXRange) els.captionXRange.value = String(settings.captionX || 0);
     if (els.captionYRange) els.captionYRange.value = String(settings.captionY || 0);
+    if (els.captionInput) els.captionInput.value = state.settings.caption || '';
     if (els.cropToggle) els.cropToggle.checked = !!settings.cropEnabled;
     if (els.cropXRange) els.cropXRange.value = String(settings.cropX || 50);
     if (els.cropYRange) els.cropYRange.value = String(settings.cropY || 50);
@@ -454,11 +718,23 @@
     if (els.outlineRange) els.outlineRange.value = String(settings.outline || 0);
     if (els.shadowRange) els.shadowRange.value = String(settings.shadow || 0);
     if (els.bgColorInput) els.bgColorInput.value = settings.bgColor || '#081c22';
+    if (els.stickerTextInput) els.stickerTextInput.value = state.settings.stickerText || '';
     if (els.stickerTextXRange) els.stickerTextXRange.value = String(settings.stickerTextX || 0);
     if (els.stickerTextYRange) els.stickerTextYRange.value = String(settings.stickerTextY || 0);
     if (els.removeBgToggle) els.removeBgToggle.checked = !!settings.removeBg;
     if (els.removeBgColor) els.removeBgColor.value = settings.removeBgColor || '#031016';
     if (els.removeBgTolerance) els.removeBgTolerance.value = String(settings.removeBgTolerance || 0);
+    if (els.cardTitleInput) els.cardTitleInput.value = state.settings.cardTitle || '';
+    if (els.cardLineInput) els.cardLineInput.value = state.settings.cardLine || '';
+    if (els.accentColorInput) els.accentColorInput.value = state.settings.accent || '#62e6d9';
+    if (els.filterSelect) els.filterSelect.value = state.settings.filter || 'none';
+    if (els.filterIntensityRange) {
+      els.filterIntensityRange.value = String(state.settings.filterIntensity || 100);
+    }
+    const intensityGroup = document.getElementById('filterIntensityGroup');
+    if (intensityGroup) {
+      intensityGroup.style.display = (state.settings.filter === 'brightness' || state.settings.filter === 'contrast') ? '' : 'none';
+    }
   }
 
   function drawImageWithSettings(ctx, img, size, settings) {
@@ -469,6 +745,58 @@
     const fit = settings.fit || 'cover';
     let source = img;
     let crop = null;
+
+    // --- Apply filter if needed ---
+    if (settings.filter && settings.filter !== 'none') {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = img.width;
+      tempCanvas.height = img.height;
+      const tctx = tempCanvas.getContext('2d');
+      tctx.drawImage(img, 0, 0);
+      let imageData = tctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      let data = imageData.data;
+      const intensity = (settings.filterIntensity || 100) / 100;
+      switch (settings.filter) {
+        case 'grayscale':
+          for (let i = 0; i < data.length; i += 4) {
+            const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+            data[i] = data[i+1] = data[i+2] = avg * intensity + data[i]*(1-intensity);
+          }
+          break;
+        case 'sepia':
+          for (let i = 0; i < data.length; i += 4) {
+            let r = data[i], g = data[i+1], b = data[i+2];
+            data[i] = Math.min(255, (r * (1 - intensity)) + (0.393 * r + 0.769 * g + 0.189 * b) * intensity);
+            data[i+1] = Math.min(255, (g * (1 - intensity)) + (0.349 * r + 0.686 * g + 0.168 * b) * intensity);
+            data[i+2] = Math.min(255, (b * (1 - intensity)) + (0.272 * r + 0.534 * g + 0.131 * b) * intensity);
+          }
+          break;
+        case 'invert':
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = 255 - data[i];
+            data[i+1] = 255 - data[i+1];
+            data[i+2] = 255 - data[i+2];
+          }
+          break;
+        case 'brightness':
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, data[i] * intensity);
+            data[i+1] = Math.min(255, data[i+1] * intensity);
+            data[i+2] = Math.min(255, data[i+2] * intensity);
+          }
+          break;
+        case 'contrast':
+          const factor = (259 * (intensity * 255 + 255)) / (255 * (259 - intensity * 255));
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, factor * (data[i] - 128) + 128);
+            data[i+1] = Math.min(255, factor * (data[i+1] - 128) + 128);
+            data[i+2] = Math.min(255, factor * (data[i+2] - 128) + 128);
+          }
+          break;
+      }
+      tctx.putImageData(imageData, 0, 0);
+      source = tempCanvas;
+    }
     if (settings.cropEnabled) {
       const cropSize = Math.max(20, Math.min(100, settings.cropSize || 100)) / 100;
       const side = Math.min(img.width, img.height) * cropSize;
@@ -1110,6 +1438,15 @@
         setStatus('Assets added.');
       });
     });
+
+    document.querySelectorAll('[data-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => applyPreset(btn.getAttribute('data-preset') || ''));
+    });
+
+    els.resetEditsBtn?.addEventListener('click', () => applyQuickEdit('reset'));
+    els.centerEditsBtn?.addEventListener('click', () => applyQuickEdit('center'));
+    els.fitCoverBtn?.addEventListener('click', () => applyQuickEdit('fit-cover'));
+    els.fitContainBtn?.addEventListener('click', () => applyQuickEdit('fit-contain'));
 
     els.clearFramesBtn?.addEventListener('click', () => {
       state.frames = [];

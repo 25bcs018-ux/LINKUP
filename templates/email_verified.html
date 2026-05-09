@@ -6,9 +6,10 @@
   <title>LinkUp • Email verification</title>
   <meta name="theme-color" content="#0b1220" />
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
   <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body class="bg-animated">
+<body class="bg-animated" data-nova-context="verify">
   <div class="auth-page">
     <div class="auth-shell">
       <section class="auth-hero" aria-label="Email verification">
@@ -47,5 +48,8 @@
       </section>
     </div>
   </div>
+  {% include "partials/nova_widget.html" %}
+  <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
 </body>
 </html>

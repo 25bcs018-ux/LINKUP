@@ -4,6 +4,60 @@
   --radius: 18px;
 }
 
+body[data-app="void"]{
+  --text: rgba(236, 242, 255, 0.92);
+  --muted: rgba(236, 242, 255, 0.62);
+  --muted2: rgba(236, 242, 255, 0.5);
+  --accent: #6bb7ff;
+  --accent2: #9ae6ff;
+  --accent3: #59c2ff;
+  --shadow: 0 22px 70px rgba(0, 0, 0, 0.65);
+  background: linear-gradient(180deg, #0a0b12 0%, #05060b 45%, #020203 78%, #000000 100%);
+}
+
+body[data-app="secure"]{
+  --text: #ecfffe;
+  --muted: rgba(236, 255, 254, 0.72);
+  --muted2: rgba(236, 255, 254, 0.52);
+  --accent: #6ee7d8;
+  --accent2: #1fb6aa;
+  --accent3: #9df4ff;
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  background:
+    radial-gradient(circle at top left, rgba(110, 231, 216, 0.16), transparent 30%),
+    radial-gradient(circle at 85% 20%, rgba(35, 165, 154, 0.24), transparent 24%),
+    linear-gradient(160deg, #06131a, #031017);
+}
+
+body[data-app="kernel"]{
+  --text: rgba(233, 241, 255, 0.92);
+  --muted: rgba(233, 241, 255, 0.6);
+  --muted2: rgba(233, 241, 255, 0.45);
+  --accent: #7dd3fc;
+  --accent2: #60a5fa;
+  --accent3: #38bdf8;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  background:
+    radial-gradient(1000px 700px at 20% 10%, rgba(125, 211, 252, 0.18), transparent 55%),
+    radial-gradient(900px 650px at 80% 20%, rgba(59, 130, 246, 0.18), transparent 55%),
+    linear-gradient(180deg, #0b1220, #05070f);
+}
+
+body[data-app="creator"]{
+  --text: #eef4ff;
+  --muted: rgba(238, 244, 255, 0.68);
+  --muted2: rgba(238, 244, 255, 0.5);
+  --accent: #4cc9f0;
+  --accent2: #ffb02e;
+  --accent3: #7dd3fc;
+  --shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(76, 201, 240, 0.18), transparent 40%),
+    radial-gradient(circle at 86% 20%, rgba(255, 176, 46, 0.14), transparent 36%),
+    radial-gradient(circle at 50% 90%, rgba(76, 201, 240, 0.12), transparent 44%),
+    linear-gradient(150deg, #0c1326, #05070f);
+}
+
 .support-page{min-height:100%;display:grid;place-items:center;padding:24px}
 .support-shell{width:min(1100px,100%);display:grid;gap:16px}
 
