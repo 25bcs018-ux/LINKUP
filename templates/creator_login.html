@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creator • Access</title>
+  <meta name="theme-color" content="#0c1326" />
+  <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='creator_login.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='app_switcher.css') }}" />
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-glow"></div>
+    <div class="login-card">
+      <div class="login-badge">VOID ACCESS</div>
+      <h1>Creator Studio</h1>
+      <p>Sign in with VOID to open Creator tools and save your work.</p>
+      <div class="login-actions">
+        <a class="btn primary" href="{{ url_for('void_sso', app='creator') }}">Login with VOID</a>
+        <a class="btn ghost" href="{{ url_for('void_hub') }}">Back to Void Hub</a>
+      </div>
+      <div class="login-footer">Need an account? Create one in VOID.</div>
+    </div>
+  </div>
+
+  {% include "partials/app_switcher.html" %}
+  <script defer src="{{ url_for('static', filename='app_switcher.js') }}"></script>
+</body>
+</html>

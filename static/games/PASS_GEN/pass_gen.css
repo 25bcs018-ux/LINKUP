@@ -1,0 +1,639 @@
+@import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=Sora:wght@300;400;500;600&display=swap');
+
+:root {
+  --pg-bg: #05070f;
+  --pg-panel: rgba(9, 12, 20, 0.8);
+  --pg-ink: rgba(230, 240, 255, 0.92);
+  --pg-muted: rgba(214, 225, 245, 0.62);
+  --pg-accent: #7ae2ff;
+  --pg-accent-2: #ffb15c;
+  --pg-danger: #ff4d4d;
+  --pg-font: 'Sora', system-ui, sans-serif;
+  --pg-display: 'Oxanium', 'Sora', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  font-family: var(--pg-font);
+  color: var(--pg-ink);
+  background: var(--pg-bg);
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.pass-gen-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.pass-gen-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(transparent 0 95%, rgba(122, 226, 255, 0.1) 95%),
+    linear-gradient(90deg, transparent 0 95%, rgba(122, 226, 255, 0.08) 95%);
+  background-size: 60px 60px;
+  opacity: 0.35;
+}
+
+.pass-gen-glow {
+  position: absolute;
+  inset: -20% 10% 0;
+  background: radial-gradient(600px 360px at 20% 10%, rgba(122, 226, 255, 0.18), transparent 70%),
+    radial-gradient(500px 420px at 80% 20%, rgba(255, 177, 92, 0.14), transparent 70%);
+  opacity: 0.8;
+}
+
+.pass-gen-noise {
+  position: absolute;
+  inset: 0;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/></filter><rect width="160" height="160" filter="url(%23n)" opacity="0.12"/></svg>');
+  mix-blend-mode: screen;
+  opacity: 0.25;
+}
+
+.pass-gen {
+  position: relative;
+  z-index: 1;
+  width: min(1200px, 94vw);
+  margin: 0 auto;
+  padding: 48px 0 60px;
+}
+
+.pass-gen__hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 20px 24px;
+  border-radius: 18px;
+  background: var(--pg-panel);
+  border: 1px solid rgba(122, 226, 255, 0.2);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.pass-gen__emblem {
+  width: 80px;
+  height: 80px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 14, 24, 0.8);
+  border: 1px solid rgba(122, 226, 255, 0.35);
+  position: relative;
+  margin-right: 8px;
+}
+
+.emblem-core {
+  font-family: var(--pg-display);
+  letter-spacing: 0.2rem;
+  color: var(--pg-accent);
+  font-weight: 700;
+}
+
+.emblem-ring {
+  position: absolute;
+  inset: 10px;
+  border-radius: 18px;
+  border: 1px dashed rgba(122, 226, 255, 0.35);
+  animation: ringSpin 10s linear infinite;
+}
+
+.emblem-ring.ring-alt {
+  inset: 18px;
+  border-style: solid;
+  opacity: 0.4;
+  animation-direction: reverse;
+}
+
+.pass-gen__kicker {
+  margin: 0 0 6px;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--pg-muted);
+}
+
+.pass-gen__hero h1 {
+  margin: 0 0 6px;
+  font-family: var(--pg-display);
+  letter-spacing: 0.3rem;
+}
+
+.pass-gen__sub {
+  margin: 0;
+  color: var(--pg-muted);
+}
+
+.pass-gen__back {
+  text-decoration: none;
+  color: var(--pg-ink);
+  border-radius: 999px;
+  padding: 10px 16px;
+  border: 1px solid rgba(122, 226, 255, 0.35);
+  background: rgba(9, 12, 20, 0.6);
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.pass-gen__back:hover {
+  transform: translateY(-1px);
+  border-color: rgba(122, 226, 255, 0.6);
+}
+
+.pass-gen__layout {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.pass-gen__badge {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: linear-gradient(120deg, rgba(14, 18, 30, 0.85), rgba(10, 14, 24, 0.7));
+  border: 1px solid rgba(122, 226, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(154, 230, 255, 0.8);
+  font-size: 0.7rem;
+}
+
+.badge-title {
+  font-family: var(--pg-display);
+  font-size: 0.9rem;
+  color: var(--pg-ink);
+}
+
+.badge-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 226, 255, 0.4);
+  background: rgba(10, 14, 24, 0.6);
+}
+
+.pass-gen__panel {
+  background: var(--pg-panel);
+  border: 1px solid rgba(122, 226, 255, 0.18);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.pass-gen__panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(400px 200px at 10% 0%, rgba(122, 226, 255, 0.12), transparent 65%);
+  pointer-events: none;
+}
+
+.pass-gen__panel h2 {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pass-gen__controls {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pass-gen__controls label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--pg-muted);
+}
+
+.pass-gen__controls select {
+  background: rgba(12, 16, 26, 0.7);
+  border: 1px solid rgba(122, 226, 255, 0.25);
+  color: var(--pg-ink);
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-family: var(--pg-font);
+}
+
+.pass-gen__note {
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--pg-muted);
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(10, 14, 24, 0.55);
+  border: 1px dashed rgba(122, 226, 255, 0.25);
+}
+
+.pass-gen__note strong {
+  color: var(--pg-ink);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+
+.btn-primary,
+.btn-ghost {
+  border: 1px solid rgba(122, 226, 255, 0.3);
+  background: rgba(10, 14, 24, 0.6);
+  color: var(--pg-ink);
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, rgba(122, 226, 255, 0.5), rgba(255, 177, 92, 0.35));
+  border-color: rgba(122, 226, 255, 0.6);
+  box-shadow: 0 12px 30px rgba(122, 226, 255, 0.2);
+}
+
+.btn-primary:hover,
+.btn-ghost:hover {
+  transform: translateY(-1px);
+  border-color: rgba(122, 226, 255, 0.6);
+}
+
+.pass-gen__arena {
+  display: grid;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.arena-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(154, 230, 255, 0.9);
+  border: 1px solid rgba(122, 226, 255, 0.4);
+  background: rgba(10, 14, 24, 0.6);
+}
+
+.arena-scanner {
+  position: absolute;
+  inset: 64px 20px auto 20px;
+  height: 140px;
+  border-radius: 14px;
+  pointer-events: none;
+  overflow: hidden;
+  border: 1px solid rgba(122, 226, 255, 0.2);
+  background: linear-gradient(180deg, rgba(122, 226, 255, 0.05), transparent 80%);
+}
+
+.arena-scanner span {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(122, 226, 255, 0.35) 45%, transparent 90%);
+  animation: scanMove 3.4s ease-in-out infinite;
+}
+
+.arena-meter {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(10, 14, 24, 0.6);
+  border: 1px solid rgba(122, 226, 255, 0.2);
+}
+
+.arena-meter span {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(122, 226, 255, 0.6), rgba(255, 177, 92, 0.4));
+  opacity: 0.7;
+  animation: meterPulse 2.6s ease-in-out infinite;
+}
+
+.arena-meter span:nth-child(2) { animation-delay: 0.2s; }
+.arena-meter span:nth-child(3) { animation-delay: 0.4s; }
+.arena-meter span:nth-child(4) { animation-delay: 0.6s; }
+.arena-meter span:nth-child(5) { animation-delay: 0.8s; }
+
+.arena-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.arena-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--pg-muted);
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(10, 14, 24, 0.6);
+  border: 1px solid rgba(122, 226, 255, 0.18);
+}
+
+.arena-meta strong {
+  color: var(--pg-accent);
+  letter-spacing: 0.1em;
+}
+
+.arena-timer {
+  text-align: right;
+  font-size: 0.85rem;
+  color: var(--pg-muted);
+}
+
+.arena-timer strong {
+  display: block;
+  font-size: 1.4rem;
+  color: var(--pg-accent);
+}
+
+.arena-display {
+  font-family: var(--pg-display);
+  font-size: 2rem;
+  letter-spacing: 0.3rem;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(10, 14, 24, 0.7);
+  border: 1px solid rgba(122, 226, 255, 0.35);
+  box-shadow: inset 0 0 20px rgba(122, 226, 255, 0.08), 0 0 30px rgba(122, 226, 255, 0.2);
+}
+
+.arena-frame {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(122, 226, 255, 0.3);
+  background: linear-gradient(135deg, rgba(8, 12, 20, 0.85), rgba(12, 16, 26, 0.6));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.frame-top,
+.frame-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.65rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(154, 230, 255, 0.7);
+}
+
+.frame-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 226, 255, 0.4);
+  background: rgba(10, 14, 24, 0.6);
+}
+
+.frame-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(122, 226, 255, 0.6);
+  box-shadow: 0 0 10px rgba(122, 226, 255, 0.6);
+}
+
+.arena-hint {
+  margin: 0;
+  color: var(--pg-muted);
+}
+
+.arena-input {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+}
+
+.arena-input input {
+  background: rgba(12, 16, 26, 0.8);
+  border: 1px solid rgba(122, 226, 255, 0.25);
+  color: var(--pg-ink);
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-family: var(--pg-display);
+  letter-spacing: 0.2rem;
+}
+
+.arena-input input:focus {
+  outline: none;
+  border-color: rgba(122, 226, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(122, 226, 255, 0.15);
+}
+
+.arena-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.arena-hints {
+  border-top: 1px solid rgba(122, 226, 255, 0.2);
+  padding-top: 12px;
+}
+
+.arena-hints--cheats {
+  border-top: 1px dashed rgba(255, 177, 92, 0.35);
+  margin-top: 6px;
+}
+
+.arena-hints-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--pg-muted);
+  margin-bottom: 8px;
+}
+
+.arena-hints ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--pg-muted);
+  display: grid;
+  gap: 6px;
+}
+
+.pass-gen__stats .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stats-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(122, 226, 255, 0.3);
+  background: rgba(10, 14, 24, 0.65);
+  margin-bottom: 14px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.stats-banner strong {
+  color: rgba(154, 230, 255, 0.9);
+  font-size: 0.8rem;
+}
+
+.pass-gen__stats span {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--pg-muted);
+}
+
+.pass-gen__stats strong {
+  font-size: 1.2rem;
+  color: var(--pg-accent);
+}
+
+.stats-rules {
+  margin-top: 16px;
+  color: var(--pg-muted);
+  font-size: 0.85rem;
+}
+
+.stats-keys {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stats-keys span {
+  border: 1px solid rgba(122, 226, 255, 0.3);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  background: rgba(10, 14, 24, 0.6);
+  color: rgba(154, 230, 255, 0.8);
+}
+
+@keyframes meterPulse {
+  0%, 100% { opacity: 0.35; transform: scaleX(0.9); }
+  50% { opacity: 1; transform: scaleX(1); }
+}
+
+@keyframes scanMove {
+  0% { transform: translateY(-120%); opacity: 0; }
+  20% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { transform: translateY(120%); opacity: 0; }
+}
+
+@keyframes ringSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 800px) {
+  .pass-gen__hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .arena-input {
+    grid-template-columns: 1fr;
+  }
+
+  .pass-gen__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pass-gen__badge {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .pass-gen__panel {
+    padding: 16px;
+  }
+
+  .arena-actions {
+    position: sticky;
+    bottom: 12px;
+    background: rgba(5, 7, 15, 0.92);
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(122, 226, 255, 0.25);
+    justify-content: space-between;
+  }
+
+  .arena-actions button {
+    flex: 1 1 auto;
+    min-width: 120px;
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+
+  .arena-display {
+    font-size: 1.5rem;
+    letter-spacing: 0.18rem;
+  }
+
+  .arena-meta {
+    font-size: 0.85rem;
+  }
+
+  .pass-gen__controls select,
+  .arena-input input {
+    font-size: 1rem;
+    padding: 12px 14px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .pass-gen {
+    padding-top: 28px;
+  }
+
+  .arena-actions {
+    gap: 8px;
+  }
+
+  .arena-actions button {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

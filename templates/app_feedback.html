@@ -13,25 +13,48 @@
   <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='support.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='app_switcher.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
   <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body class="bg-animated" data-nova-context="support" data-app="{{ app_key }}">
+<body class="bg-animated" data-nova-context="support" data-app="{{ app_key }}" data-app-label="{{ app_label }}">
   <div class="support-page">
     <div class="support-shell">
       <header class="support-top">
-        <a class="brand" href="{{ back_url }}" aria-label="Back">
+        <a class="brand" id="supportBackLink" href="{{ back_url }}" aria-label="Back">
           <span class="logo" aria-hidden="true"></span>
-          <span>{{ app_label | upper }}</span>
+          <span>VOID</span>
+          <span class="brand-sub">Feedback intake for <strong data-app-label>{{ app_label }}</strong></span>
         </a>
         <div class="top-actions">
+          <button class="btn ghost" id="appDrawerBtn" type="button">Select app</button>
           <a class="btn" href="{{ back_url }}">Back</a>
         </div>
       </header>
 
+      <aside class="app-drawer" id="appDrawer" aria-hidden="true">
+        <div class="drawer-head">
+          <div>
+            <div class="drawer-title">Choose app</div>
+            <div class="drawer-sub">Route feedback and support to the right team.</div>
+          </div>
+          <button class="btn ghost" id="appDrawerClose" type="button">Close</button>
+        </div>
+        <div class="drawer-list">
+          {% for item in drawer_items %}
+            <button class="drawer-item" type="button" data-app-select
+              data-app-key="{{ item.key }}" data-app-label="{{ item.label }}" data-app-back="{{ item.back_url }}">
+              <span>{{ item.label }}</span>
+              <span class="drawer-tag">App</span>
+            </button>
+          {% endfor %}
+        </div>
+      </aside>
+      <div class="drawer-scrim" id="appDrawerScrim" aria-hidden="true"></div>
+
       <main class="support-grid">
         <section class="card">
-          <h1>{{ app_label }} Feedback</h1>
+          <h1><span data-app-label>{{ app_label }}</span> Feedback</h1>
           <p class="muted">Tell us what you want next and what needs attention.</p>
 
           <div class="faq">
@@ -59,6 +82,7 @@
 
           <form method="POST" class="support-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <input type="hidden" id="appKeyInput" name="app_key" value="{{ app_key }}" />
             <div class="field">
               <label class="label" for="name">Name</label>
               <input class="input" id="name" name="name" maxlength="80" required placeholder="Your name" />
@@ -95,10 +119,13 @@
       </main>
     </div>
   </div>
+  {% include "partials/app_switcher.html" %}
   {% include "partials/nova_widget.html" %}
   <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
   <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
   <script defer src="{{ url_for('static', filename='kernel_runtime.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='app_switcher.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='support_hub.js') }}"></script>
   <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
 </body>
 </html>

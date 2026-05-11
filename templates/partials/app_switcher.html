@@ -1,0 +1,18 @@
+<div class="app-switcher" data-app-switcher>
+  <button class="app-switcher-btn" type="button" aria-label="Switch app">
+    <span class="app-switcher-dot" aria-hidden="true"></span>
+    <span>Apps</span>
+  </button>
+  <div class="app-switcher-panel" aria-hidden="true">
+    <div class="app-switcher-head">Switch app</div>
+    <nav class="app-switcher-list" aria-label="Apps">
+      <a class="app-switcher-item" href="{{ url_for('void_hub') }}">Void Hub</a>
+      <a class="app-switcher-item" href="{{ url_for('front') }}">LinkUp</a>
+      <a class="app-switcher-item" href="{{ url_for('kernel_page') }}">Kernel</a>
+      <a class="app-switcher-item" href="{{ url_for('linkup_secure.home') }}">Secure</a>
+      <a class="app-switcher-item" href="{{ url_for('creator_login') }}">Creator</a>
+      <a class="app-switcher-item" href="{{ url_for('void_hub') }}#games">Games</a>
+    </nav>
+  </div>
+  <div class="app-switcher-scrim" aria-hidden="true"></div>
+</div>

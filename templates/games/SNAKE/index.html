@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SNAKE • Void Games</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='games/SNAKE/snake.css') }}" />
+</head>
+<body data-void-id="{{ void_user.id if void_user else 'guest' }}">
+  <div class="snake-bg" aria-hidden="true">
+    <div class="snake-grid"></div>
+    <div class="snake-glow"></div>
+  </div>
+
+  <main class="snake" role="main">
+    <header class="snake__hero">
+      <div class="snake__logo" aria-hidden="true">
+        <span class="snake__logo-core">S</span>
+        <span class="snake__logo-ring"></span>
+      </div>
+      <div>
+        <p class="snake__kicker">Void Games</p>
+        <h1>SNAKE</h1>
+        <p class="snake__sub">Classic snake with a Void glow. Swipe or use arrows to move.</p>
+      </div>
+      <a class="snake__back" href="{{ url_for('void_hub') }}">Back to Void Hub</a>
+    </header>
+
+    <section class="snake__layout">
+      <div class="snake__panel">
+        <div class="snake__hud">
+          <div>
+            <span>Score</span>
+            <strong id="score">0</strong>
+          </div>
+          <div>
+            <span>Best</span>
+            <strong id="bestScore">0</strong>
+          </div>
+          <div>
+            <span>Speed</span>
+            <strong id="speedLabel">Normal</strong>
+          </div>
+          <div>
+            <span>Length</span>
+            <strong id="length">1</strong>
+          </div>
+          <div>
+            <span>Level</span>
+            <strong id="level">1</strong>
+          </div>
+          <div>
+            <span>Apples</span>
+            <strong id="apples">0</strong>
+          </div>
+        </div>
+        <div class="snake__progress" aria-hidden="true">
+          <span class="progress-label">Next level</span>
+          <div class="progress-bar">
+            <span id="levelProgress"></span>
+          </div>
+        </div>
+        <div class="snake__arena">
+          <canvas id="snakeCanvas" width="360" height="360"></canvas>
+          <div class="snake__overlay" id="overlay">
+            <div class="overlay-title">Ready?</div>
+            <div class="overlay-sub">Tap start or press space.</div>
+            <button class="btn-primary" id="startBtn" type="button">Start</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="snake__panel snake__side">
+        <h2>Controls</h2>
+        <p>Arrow keys or swipe to move. Avoid walls and yourself.</p>
+        <div class="snake__controls">
+          <button class="btn-ghost" data-dir="up">Up</button>
+          <div class="snake__row">
+            <button class="btn-ghost" data-dir="left">Left</button>
+            <button class="btn-ghost" data-dir="down">Down</button>
+            <button class="btn-ghost" data-dir="right">Right</button>
+          </div>
+        </div>
+        <button class="btn-primary" id="pauseBtn" type="button">Pause</button>
+        <div class="snake__settings">
+          <label>
+            Speed
+            <select id="speedSelect">
+              <option value="slow">Slow</option>
+              <option value="normal" selected>Normal</option>
+              <option value="fast">Fast</option>
+            </select>
+          </label>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='games/SNAKE/snake.js') }}" defer></script>
+</body>
+</html>
