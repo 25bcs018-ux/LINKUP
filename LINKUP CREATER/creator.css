@@ -254,6 +254,81 @@ body {
   padding-left: var(--sidebar-width);
 }
 
+body.has-auth-gate {
+  overflow: hidden;
+}
+
+body.has-auth-gate .studio-sidebar,
+body.has-auth-gate .topbar,
+body.has-auth-gate .shell,
+body.has-auth-gate .fab,
+body.has-auth-gate .studio-profile-menu,
+body.has-auth-gate .modal,
+body.has-auth-gate .tour-card {
+  filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.creator-auth {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 7, 15, 0.75);
+  backdrop-filter: blur(10px);
+}
+
+.creator-auth-card {
+  width: min(480px, 90vw);
+  border-radius: 24px;
+  padding: 28px;
+  background: linear-gradient(160deg, rgba(12, 18, 36, 0.92), rgba(6, 12, 24, 0.88));
+  border: 1px solid rgba(120, 180, 255, 0.2);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
+.creator-auth-card h1 {
+  margin: 12px 0 8px;
+  font-size: 28px;
+  letter-spacing: 0.04em;
+}
+
+.creator-auth-card p {
+  margin: 0 0 18px;
+  color: var(--muted);
+}
+
+.auth-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(238, 244, 255, 0.8);
+  border: 1px solid rgba(120, 180, 255, 0.22);
+  background: rgba(76, 201, 240, 0.12);
+}
+
+.creator-auth-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.auth-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .aurora {
   position: fixed;
   inset: -20% -10% auto;

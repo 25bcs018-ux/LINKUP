@@ -6,11 +6,26 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <title>Creator Studio</title>
   <link rel="stylesheet" href="/creator/creator.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='app_switcher.css') }}" />
 </head>
-<body>
+<body class="{% if not void_user %}has-auth-gate{% endif %}">
 
   <div class="aurora"></div>
   <div class="grid-noise"></div>
+
+  {% if not void_user %}
+  <section class="creator-auth" role="dialog" aria-modal="true" aria-label="Creator login">
+    <div class="creator-auth-card">
+      <div class="auth-badge">VOID ACCESS</div>
+      <h1>Creator Studio</h1>
+      <p>Sign in with VOID to unlock Creator tools and save your work.</p>
+      <div class="creator-auth-actions">
+        <a class="primary auth-btn" href="{{ url_for('void_sso', app='creator') }}">Login with VOID</a>
+        <a class="ghost auth-btn" href="{{ url_for('void_hub') }}">Back to Void Hub</a>
+      </div>
+    </div>
+  </section>
+  {% endif %}
 
   <!-- Sidebar Navigation -->
   <nav class="studio-sidebar" id="studioSidebar">
@@ -457,6 +472,8 @@
     </div>
   </div>
 
+  {% include "partials/app_switcher.html" %}
   <script src="/creator/creator.js"></script>
+  <script defer src="{{ url_for('static', filename='app_switcher.js') }}"></script>
 </body>
 </html>

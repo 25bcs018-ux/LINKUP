@@ -13,6 +13,7 @@
   <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
   <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
   <link rel="stylesheet" href="{{ url_for('static', filename='kernel_page.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='app_switcher.css') }}" />
   <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
   <script defer src="{{ url_for('static', filename='kernel_page.js') }}"></script>
 </head>
@@ -70,5 +71,7 @@
       </aside>
     </div>
   </div>
+  {% include "partials/app_switcher.html" %}
+  <script defer src="{{ url_for('static', filename='app_switcher.js') }}"></script>
 </body>
 </html>

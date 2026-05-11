@@ -9,7 +9,8 @@
 <body data-void-username="{{ void_user.username if void_user else '' }}"
   data-void-email="{{ void_user.email if void_user else '' }}"
   data-void-id="{{ void_user.id if void_user else '' }}"
-  data-void-created="{{ void_user.created_at.isoformat() if void_user else '' }}">
+  data-void-created="{{ void_user.created_at.isoformat() if void_user else '' }}"
+  data-show-void-tour="{{ '1' if show_void_tour else '0' }}">
   <div class="void-bg" aria-hidden="true">
     <div class="void-noise"></div>
     <div class="void-moon"></div>
@@ -46,7 +47,7 @@
           <div class="drawer-title">VOID Account</div>
           <div class="drawer-sub">Manage your profile and usage.</div>
         </div>
-        <button class="ghost" id="voidAccountClose" type="button">Close</button>
+        <button class="ghost void-close" id="voidAccountClose" type="button" aria-label="Close">X</button>
       </div>
 
       <div class="drawer-section">
@@ -90,6 +91,8 @@
       <div class="drawer-actions">
         <a class="ghost" href="{{ url_for('void_feedback') }}">Feedback</a>
         <a class="ghost" href="{{ url_for('void_support') }}">Support</a>
+        <button class="ghost" id="voidManualOpen" type="button">Void Book</button>
+        <button class="ghost" id="voidTourReplay" type="button">Replay tour</button>
         <a class="ghost" href="{{ url_for('void_logout') }}">Sign out</a>
       </div>
     </aside>
@@ -98,7 +101,7 @@
     <section class="void-apps" aria-label="Applications">
       <div class="app-tabs" role="tablist" aria-label="Apps">
         <button class="app-tab is-active" type="button" role="tab" aria-selected="true"
-                data-app="linkup" data-title="LinkUp" data-desc="Core messaging and presence."
+          data-app="linkup" data-title="LinkUp" data-desc="Core messaging and presence."
           data-href="{{ url_for('front') }}" style="--delay: 0ms;">
           <span class="app-logo">
             <img src="{{ url_for('static', filename='linkup_logo.svg') }}" alt="LinkUp" />
@@ -133,7 +136,7 @@
 
         <button class="app-tab" type="button" role="tab" aria-selected="false"
                 data-app="creator" data-title="Creator" data-desc="Design, media, and build tools."
-                data-href="{{ url_for('creator_studio') }}" style="--delay: 360ms;">
+          data-href="{{ url_for('creator_login') }}" style="--delay: 360ms;">
           <span class="app-logo creator-logo" aria-hidden="true">
             <svg viewBox="0 0 64 64" aria-hidden="true">
               <circle cx="32" cy="32" r="28" fill="#62e6d9" opacity="0.18" />
@@ -161,10 +164,239 @@
         <p class="void-sub">Arcade space for Void-connected experiences.</p>
       </div>
       <div class="void-games-panel">
-        <span>Games</span>
+        <a class="void-game-card" href="{{ url_for('pass_gen_game') }}">
+          <div class="void-game-logo" aria-hidden="true">
+            <span class="void-game-logo-core">PG</span>
+            <span class="void-game-logo-ring"></span>
+          </div>
+          <div class="void-game-title">PASS_GEN</div>
+          <div class="void-game-sub">Guess the password before time runs out.</div>
+          <div class="void-game-meta">Difficulty • Hints • Timer</div>
+        </a>
+        <a class="void-game-card" href="{{ url_for('snake_game') }}">
+          <div class="void-game-logo snake-logo" aria-hidden="true">
+            <span class="void-game-logo-core">S</span>
+            <span class="void-game-logo-ring"></span>
+          </div>
+          <div class="void-game-title">SNAKE</div>
+          <div class="void-game-sub">Classic snake with Void glow.</div>
+          <div class="void-game-meta">Swipe • Arrows • Speed</div>
+        </a>
       </div>
     </section>
   </main>
+
+  <section class="void-tour" id="voidTour" aria-hidden="true">
+    <div class="void-tour-card" role="dialog" aria-modal="true" aria-labelledby="voidTourTitle">
+      <div class="void-tour-guide">
+        <div class="guide-orb" aria-hidden="true">
+          <span class="guide-core"></span>
+        </div>
+        <div>
+          <div class="guide-name">Void Guide</div>
+          <div class="guide-title">Navigator</div>
+        </div>
+      </div>
+      <div class="void-tour-step" id="voidTourStep">Step 1 of 5</div>
+      <div class="void-tour-voice" id="voidTourVoice">Hey, I will walk you through the hub.</div>
+      <h2 id="voidTourTitle">Welcome to VOID</h2>
+      <p id="voidTourCopy">Your hub connects every app. Start here and jump into any experience.</p>
+      <div class="void-tour-hint" id="voidTourHint">Hint: hover the app cards to preview.</div>
+      <div class="void-tour-actions">
+        <button class="ghost" id="voidTourBack" type="button">Back</button>
+        <button class="ghost" id="voidTourSkip" type="button">Skip</button>
+        <button class="primary" id="voidTourNext" type="button">Next</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="void-manual" id="voidManual" aria-hidden="true">
+    <div class="void-manual-shell" role="dialog" aria-modal="true" aria-labelledby="voidManualTitle">
+      <header class="void-manual-head">
+        <div>
+          <div class="manual-kicker">Void Book</div>
+          <h2 id="voidManualTitle">The Void Manual</h2>
+          <p class="manual-sub">A living guide to the hub, the apps, and how everything moves together.</p>
+        </div>
+        <button class="ghost void-close" id="voidManualClose" type="button" aria-label="Close">X</button>
+      </header>
+
+      <div class="void-manual-body">
+        <nav class="manual-nav" aria-label="Manual chapters">
+          <button class="manual-tab is-active" type="button" data-chapter="intro">Intro</button>
+          <button class="manual-tab" type="button" data-chapter="objectives">Objectives</button>
+          <button class="manual-tab" type="button" data-chapter="privacy">Privacy</button>
+          <button class="manual-tab" type="button" data-chapter="familiarity">Familiarity</button>
+          <button class="manual-tab" type="button" data-chapter="operate">How to Operate</button>
+          <button class="manual-tab" type="button" data-chapter="linkup">LinkUp</button>
+          <button class="manual-tab" type="button" data-chapter="secure">Secure</button>
+          <button class="manual-tab" type="button" data-chapter="kernel">Kernel</button>
+          <button class="manual-tab" type="button" data-chapter="creator">Creator</button>
+          <button class="manual-tab" type="button" data-chapter="games">Games</button>
+          <button class="manual-tab" type="button" data-chapter="updates">New Update</button>
+          <button class="manual-tab" type="button" data-chapter="support">Support</button>
+        </nav>
+
+        <div class="manual-page" id="voidManualPage">
+          <article class="manual-chapter is-active" data-chapter="intro">
+            <h3>What is VOID?</h3>
+            <p>VOID is the body. Every app is a part of it. You enter the body once, then choose the part that fits your moment. It is a hub that keeps your identity, privacy, and momentum in one place.</p>
+            <p>Think of VOID as a control room for human connection, creation, and secure movement across experiences.</p>
+          </article>
+
+          <article class="manual-chapter" data-chapter="objectives">
+            <h3>The Objectives of VOID</h3>
+            <ul>
+              <li>Unify identity so you sign in once and move everywhere.</li>
+              <li>Reduce friction so switching apps feels instant.</li>
+              <li>Keep privacy first with clear boundaries between apps.</li>
+              <li>Make every experience feel guided and familiar.</li>
+              <li>Keep support and feedback in one place.</li>
+            </ul>
+          </article>
+
+          <article class="manual-chapter" data-chapter="privacy">
+            <h3>Privacy in VOID</h3>
+            <p>VOID treats privacy like a core system, not a setting. Every app inherits secure foundations and stays isolated so your data is scoped to the space you are using.</p>
+            <ul>
+              <li>Identity is centralized, but data is segmented by app.</li>
+              <li>Access is explicit: you choose where you enter and what you share.</li>
+              <li>Security is visible, not hidden. You can see how to sign out and revoke access quickly.</li>
+            </ul>
+          </article>
+
+          <article class="manual-chapter" data-chapter="familiarity">
+            <h3>Familiarity and Flow</h3>
+            <p>VOID is designed to feel like a place you can return to. Every app uses shared patterns so you never relearn the basics.</p>
+            <ul>
+              <li>One hub, one identity, one rhythm.</li>
+              <li>Consistent navigation and consistent support.</li>
+              <li>Shortcuts like the app switcher keep your flow fast.</li>
+            </ul>
+          </article>
+
+          <article class="manual-chapter" data-chapter="operate">
+            <h3>How to Operate VOID</h3>
+            <ol>
+              <li>Enter the hub and scan the apps on the left.</li>
+              <li>Hover a card to preview. Click to launch.</li>
+              <li>Open the account drawer for profile, usage, and support.</li>
+              <li>Use the app switcher button to jump between apps at any time.</li>
+              <li>Return to the hub whenever you want a full reset.</li>
+            </ol>
+          </article>
+
+          <article class="manual-chapter" data-chapter="linkup">
+            <h3>LinkUp</h3>
+            <p>LinkUp is the core messaging and presence layer. It is designed to feel human and safe.</p>
+            <h4>Why it exists</h4>
+            <p>To reduce noise and make conversation intentional. No random DMs. No chaos.</p>
+            <h4>How it works</h4>
+            <ul>
+              <li>Contact requests are required before direct messages.</li>
+              <li>Messages are encrypted at rest in storage.</li>
+              <li>Groups use majority voting for membership changes.</li>
+              <li>NOVA assistant can help inside chats.</li>
+            </ul>
+            <h4>How to use it</h4>
+            <ul>
+              <li>Send a contact request, wait for acceptance, then chat.</li>
+              <li>Create a group and invite members. Votes handle changes.</li>
+              <li>Open NOVA from the chat interface for guidance.</li>
+            </ul>
+          </article>
+
+          <article class="manual-chapter" data-chapter="secure">
+            <h3>Secure</h3>
+            <p>Secure is the private vault side of VOID. It is where sealed conversations and protected content live.</p>
+            <h4>Why it exists</h4>
+            <p>To give you a space where privacy is the default, not a feature.</p>
+            <h4>How it works</h4>
+            <ul>
+              <li>Private spaces are isolated from the rest of the system.</li>
+              <li>Access is deliberate. You choose who can enter.</li>
+              <li>Content is treated as sensitive by default.</li>
+            </ul>
+            <h4>How to use it</h4>
+            <ul>
+              <li>Enter Secure for protected chats or vaults.</li>
+              <li>Keep sensitive threads here instead of open spaces.</li>
+              <li>Exit Secure when you are done to return to the hub.</li>
+            </ul>
+          </article>
+
+          <article class="manual-chapter" data-chapter="kernel">
+            <h3>Kernel</h3>
+            <p>Kernel is the control and operations layer. It helps you understand and manage what is running inside VOID.</p>
+            <h4>Why it exists</h4>
+            <p>To give you visibility and control over your environment.</p>
+            <h4>How it works</h4>
+            <ul>
+              <li>Status views show system and workspace activity.</li>
+              <li>Operator tools keep your tasks organized.</li>
+              <li>Shortcuts reduce the time it takes to move between tools.</li>
+            </ul>
+            <h4>How to use it</h4>
+            <ul>
+              <li>Open Kernel when you want control panels and system views.</li>
+              <li>Use it as your command bridge before switching apps.</li>
+            </ul>
+          </article>
+
+          <article class="manual-chapter" data-chapter="creator">
+            <h3>Creator</h3>
+            <p>Creator is your studio inside VOID. It is designed for building, designing, and shaping content.</p>
+            <h4>Why it exists</h4>
+            <p>To move from idea to output without leaving the VOID ecosystem.</p>
+            <h4>How it works</h4>
+            <ul>
+              <li>Workspace tools focus on design and media flow.</li>
+              <li>Projects keep your work organized.</li>
+              <li>Templates and assets speed up creation.</li>
+            </ul>
+            <h4>How to use it</h4>
+            <ul>
+              <li>Open Creator when you want to make or publish.</li>
+              <li>Start a project, add assets, and iterate.</li>
+            </ul>
+          </article>
+
+          <article class="manual-chapter" data-chapter="games">
+            <h3>Games</h3>
+            <p>Games is the play space. It is connected to VOID so your identity follows you, but play stays playful.</p>
+            <h4>Why it exists</h4>
+            <p>To keep a lightweight space for experiments and arcade experiences.</p>
+            <h4>How to use it</h4>
+            <ul>
+              <li>Open Games to explore mini experiences.</li>
+              <li>Return to the hub whenever you want to switch modes.</li>
+            </ul>
+          </article>
+
+          <article class="manual-chapter" data-chapter="updates">
+            <h3>New Update</h3>
+            <p>What is new in VOID right now:</p>
+            <ul>
+              <li>Added games: PASS_GEN (password guesser) and Snake.</li>
+              <li>App drawer improvements and new navigation flow.</li>
+              <li>Bug fixes across the hub, auth flow, and UI stability.</li>
+            </ul>
+            <p>This section will be refreshed each time VOID evolves.</p>
+          </article>
+
+          <article class="manual-chapter" data-chapter="support">
+            <h3>Support and Feedback</h3>
+            <p>All support and feedback flows into VOID. It keeps requests organized and makes sure the right app team sees your message.</p>
+            <ul>
+              <li>Use Support for issues or help requests.</li>
+              <li>Use Feedback for ideas, improvements, and product thoughts.</li>
+              <li>Pick the app in the drawer so it routes correctly.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <script src="{{ url_for('static', filename='void_hub.js') }}" defer></script>
 </body>

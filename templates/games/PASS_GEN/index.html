@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PASS_GEN • Void Games</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='games/PASS_GEN/pass_gen.css') }}" />
+</head>
+<body data-void-id="{{ void_user.id if void_user else 'guest' }}">
+  <div class="pass-gen-bg" aria-hidden="true">
+    <div class="pass-gen-grid"></div>
+    <div class="pass-gen-glow"></div>
+    <div class="pass-gen-noise"></div>
+  </div>
+
+  <main class="pass-gen" role="main">
+    <header class="pass-gen__hero">
+      <div class="pass-gen__emblem" aria-hidden="true">
+        <div class="emblem-core">PG</div>
+        <div class="emblem-ring"></div>
+        <div class="emblem-ring ring-alt"></div>
+      </div>
+      <div>
+        <p class="pass-gen__kicker">Void Games</p>
+        <h1>PASS_GEN</h1>
+        <p class="pass-gen__sub">Guess the password before the timer expires. Use hints wisely.</p>
+      </div>
+      <a class="pass-gen__back" href="{{ url_for('void_hub') }}">Back to Void Hub</a>
+    </header>
+
+    <section class="pass-gen__layout">
+      <div class="pass-gen__badge" aria-hidden="true">
+        <div class="badge-line">Encryption Deck</div>
+        <div class="badge-title">Signal Locked</div>
+        <div class="badge-chip">PASS_GEN</div>
+      </div>
+      <div class="pass-gen__panel">
+        <h2>Mission Setup</h2>
+        <div class="pass-gen__controls">
+          <label>
+            Difficulty
+            <select id="difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </label>
+          <label>
+            Time Limit
+            <select id="timeLimit">
+              <option value="auto" selected>Auto</option>
+              <option value="30">30 sec</option>
+              <option value="45">45 sec</option>
+              <option value="60">60 sec</option>
+            </select>
+          </label>
+          <div class="pass-gen__note">
+            <strong>Hints by difficulty:</strong>
+            <span>Easy 3 • Medium 2 • Hard 1</span>
+          </div>
+        </div>
+        <button class="btn-primary" id="startGame" type="button">Start Round</button>
+      </div>
+
+      <div class="pass-gen__panel pass-gen__arena">
+        <div class="arena-head">
+          <h2>Password Terminal</h2>
+          <div class="arena-timer">
+            <span>Time</span>
+            <strong id="timer">--</strong>
+          </div>
+        </div>
+        <div class="arena-status">
+          <span class="status-pill">Signal: Locked</span>
+          <span class="status-pill">Mode: Reactive</span>
+          <span class="status-pill">Security: Active</span>
+        </div>
+        <div class="arena-meta">
+          <span>Length</span>
+          <strong id="passLength">--</strong>
+        </div>
+        <div class="arena-meter" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="arena-scanner" aria-hidden="true">
+          <span></span>
+        </div>
+        <div class="arena-frame">
+          <div class="frame-top">
+            <span class="frame-label">VOID ENCRYPTION GRID</span>
+            <span class="frame-chip">PASS_GEN</span>
+          </div>
+          <div class="arena-display" id="maskedPassword">----</div>
+          <div class="frame-bottom">
+            <span class="frame-dot"></span>
+            <span class="frame-dot"></span>
+            <span class="frame-dot"></span>
+          </div>
+        </div>
+        <p class="arena-hint" id="narrator">Choose your setup and start a round.</p>
+
+        <div class="arena-input">
+          <input id="guessInput" type="text" placeholder="Enter password" autocomplete="off" spellcheck="false" />
+          <button class="btn-primary" id="guessBtn" type="button">Guess</button>
+        </div>
+
+        <div class="arena-actions">
+          <button class="btn-ghost" id="cheatBtn" type="button">Use Cheat</button>
+          <button class="btn-ghost" id="giveUpBtn" type="button">Give Up</button>
+          <button class="btn-ghost" id="newRoundBtn" type="button">New Round</button>
+        </div>
+
+        <div class="arena-hints">
+          <div class="arena-hints-title">Default Hints</div>
+          <ul id="hintList"></ul>
+        </div>
+        <div class="arena-hints arena-hints--cheats">
+          <div class="arena-hints-title">Cheat Intel</div>
+          <ul id="cheatList"></ul>
+        </div>
+      </div>
+
+      <aside class="pass-gen__panel pass-gen__stats" aria-label="Game stats">
+        <h2>Stats</h2>
+        <div class="stats-banner">
+          <span>Agent Readout</span>
+          <strong>Void Operator</strong>
+        </div>
+        <div class="stats-grid">
+          <div>
+            <span>Attempts Left</span>
+            <strong id="attemptsLeft">--</strong>
+          </div>
+          <div>
+            <span>Cheat Tokens</span>
+            <strong id="cheatTokens">2</strong>
+          </div>
+          <div>
+            <span>Hints Provided</span>
+            <strong id="defaultHints">--</strong>
+          </div>
+          <div>
+            <span>Score</span>
+            <strong id="score">0</strong>
+          </div>
+          <div>
+            <span>Streak</span>
+            <strong id="streak">0</strong>
+          </div>
+          <div>
+            <span>Best</span>
+            <strong id="bestScore">0</strong>
+          </div>
+        </div>
+        <div class="stats-rules">
+          <p><strong>Rule:</strong> One guess per attempt. Use hints to unlock clues.</p>
+          <p><strong>Bonus:</strong> Faster wins earn more points.</p>
+        </div>
+        <div class="stats-keys" aria-hidden="true">
+          <span>CTRL</span><span>ALT</span><span>SHIFT</span><span>ENTER</span>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='games/PASS_GEN/pass_gen.js') }}" defer></script>
+</body>
+</html>

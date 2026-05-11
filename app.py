@@ -19,8 +19,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import HTTPException
 
-from flask import Flask, request, render_template, render_template_string, redirect, url_for, session, jsonify, send_from_directory
+from flask import Flask, request, render_template, render_template_string, redirect, url_for, session, jsonify, send_from_directory, make_response
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -145,6 +146,16 @@ def _api_500(e):
     if _is_api_request():
         return jsonify({'error': 'server_error'}), 500
     return e
+
+
+@app.errorhandler(Exception)
+def _log_unhandled_exception(e):
+    if isinstance(e, HTTPException):
+        return e
+    app.logger.exception("Unhandled exception")
+    if _is_api_request():
+        return jsonify({'error': 'server_error'}), 500
+    return ('Internal Server Error', 500)
 
 
 @app.before_request
@@ -2481,9 +2492,15 @@ def void_root():
 
 @app.route('/void-auth')
 def void_auth():
+    if _get_void_user():
+        return redirect(url_for('void_hub'))
     created = request.args.get('created') == '1'
     next_app = (request.args.get('next') or '').strip().lower()
-    return render_template('void_auth.html', created=created, next_app=next_app)
+    response = make_response(render_template('void_auth.html', created=created, next_app=next_app))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 def _void_app_redirect(app_key: str) -> str:
@@ -2553,7 +2570,18 @@ def void_hub():
     void_user = _get_void_user()
     if not void_user:
         return redirect(url_for('void_auth'))
-    return render_template('void_hub.html', void_user=void_user)
+    show_void_tour = session.pop('void_show_tour', None) == '1'
+    return render_template('void_hub.html', void_user=void_user, show_void_tour=show_void_tour)
+
+
+@app.route('/games/pass-gen')
+def pass_gen_game():
+    return render_template('games/PASS_GEN/index.html', void_user=_get_void_user())
+
+
+@app.route('/games/snake')
+def snake_game():
+    return render_template('games/SNAKE/index.html', void_user=_get_void_user())
 
 
 @app.route('/void/login', methods=['POST'])
@@ -2568,6 +2596,7 @@ def void_login():
 
     if void_user and check_password_hash(void_user.password, password):
         _login_void_user(void_user)
+        session['void_show_tour'] = '1'
         if next_app:
             if next_app == 'linkup':
                 user = _linkup_user_from_void(void_user)
@@ -2658,6 +2687,8 @@ def void_register():
     db.session.add(void_user)
     db.session.commit()
 
+    session['void_show_tour'] = '1'
+
     if next_app:
         _login_void_user(void_user)
         if next_app == 'linkup':
@@ -2721,7 +2752,17 @@ def creator_studio():
     if not path.exists():
         return 'Creator studio not found', 404
     html = path.read_text(encoding='utf-8')
-    return render_template_string(html)
+    void_user = _get_void_user()
+    if not void_user:
+        return redirect(url_for('creator_login'))
+    return render_template_string(html, void_user=void_user)
+
+
+@app.route('/creator/login')
+def creator_login():
+    if _get_void_user():
+        return redirect(url_for('creator_studio'))
+    return render_template('creator_login.html')
 
 
 @app.route('/creator/<path:filename>')
@@ -4849,11 +4890,59 @@ def api_account_delete():
 
 
 @app.route('/support', methods=['GET', 'POST'])
+def _support_app_meta(app_key: str):
+    key = (app_key or '').strip().lower()
+    if key == 'linkup':
+        return {'key': 'linkup', 'label': 'LinkUp', 'back_url': url_for('chats')}
+    if key == 'secure':
+        return {'key': 'secure', 'label': 'Secure', 'back_url': url_for('linkup_secure.home')}
+    if key == 'kernel':
+        return {'key': 'kernel', 'label': 'Kernel', 'back_url': url_for('kernel_page')}
+    if key == 'creator':
+        return {'key': 'creator', 'label': 'Creator', 'back_url': url_for('creator_studio')}
+    if key == 'games':
+        return {'key': 'games', 'label': 'Games', 'back_url': url_for('void_hub')}
+    return {'key': 'void', 'label': 'Void', 'back_url': url_for('void_hub')}
+
+
+def _support_drawer_items():
+    return [
+        {'key': 'linkup', 'label': 'LinkUp', 'back_url': url_for('chats')},
+        {'key': 'kernel', 'label': 'Kernel', 'back_url': url_for('kernel_page')},
+        {'key': 'secure', 'label': 'Secure', 'back_url': url_for('linkup_secure.home')},
+        {'key': 'creator', 'label': 'Creator', 'back_url': url_for('creator_studio')},
+        {'key': 'games', 'label': 'Games', 'back_url': url_for('void_hub')},
+    ]
+
+
+def _support_category_tag(app_key: str, category: str) -> str:
+    key = (app_key or 'void').strip().lower()[:8]
+    cat = (category or 'general').strip().lower()[:11]
+    return f"{key}:{cat}"[:20]
+
+
+def _store_support_ticket(me: User | None, category: str, subject: str, message: str) -> bool:
+    if not me:
+        return False
+    t = SupportTicket(
+        user_id=me.id,
+        category=category[:20],
+        subject=subject[:80],
+        message=message[:1200],
+    )
+    db.session.add(t)
+    db.session.commit()
+    return True
+
+
+@app.route('/support', methods=['GET', 'POST'])
 def support():
     me = _get_me()
     if not me:
         return redirect(url_for('login'))
 
+    app_key = (request.form.get('app_key') or request.args.get('app') or 'linkup').strip().lower()
+    meta = _support_app_meta(app_key)
     ok = None
     error = None
 
@@ -4869,14 +4958,9 @@ def support():
         elif len(message) > 1200:
             error = 'Message is too long.'
         else:
-            t = SupportTicket(
-                user_id=me.id,
-                category=category[:20],
-                subject=subject,
-                message=message,
-            )
-            db.session.add(t)
-            db.session.commit()
+            category_tag = _support_category_tag(meta['key'], category)
+            message_full = f"App: {meta['label']}\n\n{message}"
+            _store_support_ticket(me, category_tag, subject, message_full)
             ok = 'Ticket submitted. We’ll get back to you.'
 
     tickets = (
@@ -4887,12 +4971,26 @@ def support():
         .all()
     )
 
-    return render_template('support.html', me=me, tickets=tickets, ok=ok, error=error)
+    return render_template(
+        'support.html',
+        me=me,
+        tickets=tickets,
+        ok=ok,
+        error=error,
+        app_key=meta['key'],
+        app_label=meta['label'],
+        back_url=meta['back_url'],
+        drawer_items=_support_drawer_items(),
+    )
 
 
 def _render_app_support(app_label: str, app_key: str, back_url: str):
     ok = None
     error = None
+
+    selected_key = (request.form.get('app_key') or request.args.get('app') or app_key).strip().lower()
+    meta = _support_app_meta(selected_key)
+    me = _get_me()
 
     if request.method == 'POST':
         name = (request.form.get('name') or '').strip()
@@ -4908,21 +5006,29 @@ def _render_app_support(app_label: str, app_key: str, back_url: str):
         elif len(message) > 1200:
             error = 'Message is too long.'
         else:
+            category_tag = _support_category_tag(meta['key'], category)
+            message_full = f"App: {meta['label']}\nName: {name}\nEmail: {email}\n\n{message}"
+            _store_support_ticket(me, category_tag, subject, message_full)
             ok = 'Thanks. Your support request is recorded.'
 
     return render_template(
         'app_support.html',
-        app_label=app_label,
-        app_key=app_key,
-        back_url=back_url,
+        app_label=meta['label'],
+        app_key=meta['key'],
+        back_url=meta['back_url'],
         ok=ok,
         error=error,
+        drawer_items=_support_drawer_items(),
     )
 
 
 def _render_app_feedback(app_label: str, app_key: str, back_url: str):
     ok = None
     error = None
+
+    selected_key = (request.form.get('app_key') or request.args.get('app') or app_key).strip().lower()
+    meta = _support_app_meta(selected_key)
+    me = _get_me()
 
     if request.method == 'POST':
         name = (request.form.get('name') or '').strip()
@@ -4937,15 +5043,23 @@ def _render_app_feedback(app_label: str, app_key: str, back_url: str):
         elif rating and rating not in {'1', '2', '3', '4', '5'}:
             error = 'Invalid rating.'
         else:
+            category_tag = _support_category_tag(meta['key'], 'feedback')
+            subject = f"{meta['label']} feedback"
+            message_full = (
+                f"App: {meta['label']}\nName: {name}\nEmail: {email}\n"
+                f"Rating: {rating or 'n/a'}\n\n{message}"
+            )
+            _store_support_ticket(me, category_tag, subject, message_full)
             ok = 'Thanks. Your feedback is recorded.'
 
     return render_template(
         'app_feedback.html',
-        app_label=app_label,
-        app_key=app_key,
-        back_url=back_url,
+        app_label=meta['label'],
+        app_key=meta['key'],
+        back_url=meta['back_url'],
         ok=ok,
         error=error,
+        drawer_items=_support_drawer_items(),
     )
 
 

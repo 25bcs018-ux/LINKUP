@@ -14,6 +14,7 @@
     <link rel="manifest" href="{{ url_for('linkup_secure.secure_manifest') }}" />
     <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
     <link rel="stylesheet" href="{{ url_for('linkup_secure.static', filename='secure.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='app_switcher.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
     <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
@@ -106,9 +107,11 @@
             </div>
         </section>
     </div>
+    {% include "partials/app_switcher.html" %}
     {% include "partials/nova_widget.html" %}
     <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
     <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='app_switcher.js') }}"></script>
     <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
     <script>
         (() => {

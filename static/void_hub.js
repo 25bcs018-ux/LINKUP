@@ -11,6 +11,21 @@
   const accountDrawer = document.getElementById('voidAccountDrawer');
   const accountClose = document.getElementById('voidAccountClose');
   const accountScrim = document.getElementById('voidAccountScrim');
+  const tourReplay = document.getElementById('voidTourReplay');
+  const manualOpen = document.getElementById('voidManualOpen');
+  const manual = document.getElementById('voidManual');
+  const manualClose = document.getElementById('voidManualClose');
+  const manualTabs = Array.from(document.querySelectorAll('.manual-tab'));
+  const manualChapters = Array.from(document.querySelectorAll('.manual-chapter'));
+  const tour = document.getElementById('voidTour');
+  const tourStep = document.getElementById('voidTourStep');
+  const tourVoice = document.getElementById('voidTourVoice');
+  const tourTitle = document.getElementById('voidTourTitle');
+  const tourCopy = document.getElementById('voidTourCopy');
+  const tourHint = document.getElementById('voidTourHint');
+  const tourBack = document.getElementById('voidTourBack');
+  const tourNext = document.getElementById('voidTourNext');
+  const tourSkip = document.getElementById('voidTourSkip');
 
   const usageKeys = ['linkup', 'secure', 'kernel', 'creator'];
 
@@ -85,6 +100,49 @@
     accountScrim?.setAttribute('aria-hidden', 'true');
   }
 
+  function isTourOpen() {
+    return tour?.classList.contains('is-open');
+  }
+
+  function isManualOpen() {
+    return manual?.classList.contains('is-open');
+  }
+
+  function updateModalState() {
+    if (isTourOpen() || isManualOpen()) {
+      document.body.classList.add('void-modal-open');
+    } else {
+      document.body.classList.remove('void-modal-open');
+    }
+  }
+
+  function openManual() {
+    if (!manual) return;
+    if (isTourOpen()) closeTour();
+    manual.classList.add('is-open');
+    manual.setAttribute('aria-hidden', 'false');
+    closeAccountDrawer();
+    updateModalState();
+  }
+
+  function closeManual() {
+    if (!manual) return;
+    manual.classList.remove('is-open');
+    manual.setAttribute('aria-hidden', 'true');
+    updateModalState();
+  }
+
+  function setManualChapter(chapter) {
+    manualTabs.forEach((tab) => {
+      const isActive = tab.dataset.chapter === chapter;
+      tab.classList.toggle('is-active', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    manualChapters.forEach((section) => {
+      section.classList.toggle('is-active', section.dataset.chapter === chapter);
+    });
+  }
+
   function setActive(tab) {
     if (!tab) return;
     tabs.forEach((t) => {
@@ -122,9 +180,156 @@
   accountBtn?.addEventListener('click', openAccountDrawer);
   accountClose?.addEventListener('click', closeAccountDrawer);
   accountScrim?.addEventListener('click', closeAccountDrawer);
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeAccountDrawer();
+  manualOpen?.addEventListener('click', openManual);
+  manualClose?.addEventListener('click', closeManual);
+  manualTabs.forEach((tab) => {
+    tab.addEventListener('click', () => setManualChapter(tab.dataset.chapter));
   });
+  if (manualTabs.length > 0) {
+    setManualChapter(manualTabs[0].dataset.chapter);
+  }
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (isManualOpen()) {
+      closeManual();
+      return;
+    }
+    if (isTourOpen()) {
+      closeTour();
+      return;
+    }
+    closeAccountDrawer();
+  });
+
+  const tourSlides = [
+    {
+      voice: 'Hey, I am your guide. I will keep this quick and human.',
+      title: 'Welcome to VOID',
+      copy: 'This is the hub. Every app starts here, and your Void ID carries you across them.',
+      hint: 'Hover the app cards to preview the experience.',
+      target: '.void-head'
+    },
+    {
+      voice: 'Each card is a doorway. Pick the one that matches your moment.',
+      title: 'Choose an app',
+      copy: 'Tap a card to launch LinkUp, Secure, Kernel, or Creator.',
+      hint: 'Click a card to enter right away.',
+      target: '.app-tabs'
+    },
+    {
+      voice: 'This one is your identity control room.',
+      title: 'Open your account drawer',
+      copy: 'Profile details, usage, support, and the Void Book live here.',
+      hint: 'Hit Account to open the drawer.',
+      target: '#voidAccountBtn',
+      ensureDrawer: true
+    },
+    {
+      voice: 'If you forget anything, the book is your map.',
+      title: 'The Void Book',
+      copy: 'This manual explains the mission, the apps, and how to move around.',
+      hint: 'Open the Void Book for the full guide.',
+      target: '#voidAccountDrawer',
+      ensureDrawer: true
+    },
+    {
+      voice: 'You are ready. I will stay quiet unless you call me.',
+      title: 'Launch and explore',
+      copy: 'Jump into an app and build your flow. You can replay this tour anytime.',
+      hint: 'Use the app switcher to jump between apps fast.',
+      target: '.app-panel'
+    }
+  ];
+
+  function shouldShowTour() {
+    const flag = document.body?.dataset?.showVoidTour === '1';
+    if (!flag) return false;
+    try {
+      return localStorage.getItem('void_tour_done') !== '1';
+    } catch {
+      return true;
+    }
+  }
+
+  function markTourDone() {
+    try {
+      localStorage.setItem('void_tour_done', '1');
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function renderTour(index) {
+    const slide = tourSlides[index] || tourSlides[0];
+    if (tourStep) tourStep.textContent = `Step ${index + 1} of ${tourSlides.length}`;
+    if (tourVoice) tourVoice.textContent = slide.voice || '';
+    if (tourTitle) tourTitle.textContent = slide.title;
+    if (tourCopy) tourCopy.textContent = slide.copy;
+    if (tourHint) tourHint.textContent = slide.hint || '';
+    if (tourNext) tourNext.textContent = index === tourSlides.length - 1 ? 'Finish' : 'Next';
+    if (tourBack) tourBack.disabled = index === 0;
+    setTourTarget(slide.target);
+    if (slide.ensureDrawer) {
+      openAccountDrawer();
+    }
+  }
+
+  let activeTourTarget = null;
+  function setTourTarget(selector) {
+    if (activeTourTarget) activeTourTarget.classList.remove('tour-target');
+    if (!selector) {
+      activeTourTarget = null;
+      return;
+    }
+    const nextTarget = document.querySelector(selector);
+    if (nextTarget) {
+      nextTarget.classList.add('tour-target');
+      activeTourTarget = nextTarget;
+    }
+  }
+
+  function openTour() {
+    if (!tour) return;
+    closeManual();
+    tourIndex = 0;
+    renderTour(0);
+    tour.classList.add('is-open');
+    tour.setAttribute('aria-hidden', 'false');
+    updateModalState();
+  }
+
+  function closeTour() {
+    if (!tour) return;
+    tour.classList.remove('is-open');
+    tour.setAttribute('aria-hidden', 'true');
+    markTourDone();
+    setTourTarget(null);
+    updateModalState();
+  }
+
+  let tourIndex = 0;
+  tourBack?.addEventListener('click', () => {
+    tourIndex = Math.max(0, tourIndex - 1);
+    renderTour(tourIndex);
+  });
+  tourNext?.addEventListener('click', () => {
+    tourIndex += 1;
+    if (tourIndex >= tourSlides.length) {
+      closeTour();
+      return;
+    }
+    renderTour(tourIndex);
+  });
+
+  tourSkip?.addEventListener('click', closeTour);
+  tourReplay?.addEventListener('click', () => {
+    openTour();
+    closeAccountDrawer();
+  });
+
+  if (shouldShowTour()) {
+    openTour();
+  }
 
 
   setActive(tabs[0]);
