@@ -33,6 +33,7 @@ body.void-modal-open {
   overflow: hidden;
 }
 
+
 .void-bg {
   position: fixed;
   inset: 0;
@@ -92,6 +93,7 @@ body.void-modal-open {
   background: radial-gradient(75% 65% at 50% 30%, transparent 55%, rgba(0, 0, 0, 0.85) 100%);
   opacity: 0.9;
 }
+
 
 .void-hub {
   position: relative;
@@ -662,19 +664,20 @@ body.void-modal-open {
   border: 1px solid rgba(107, 183, 255, 0.16);
   color: inherit;
   cursor: pointer;
-  opacity: 0;
+  opacity: 1;
   transform: translateY(20px) scale(0.98);
-  animation: cardIn 600ms ease forwards;
-  animation-delay: var(--delay, 0ms);
+  animation: cardIn 600ms ease forwards, appTabHover 0.4s ease-in-out infinite;
+  animation-delay: var(--delay, 0ms), var(--delay, 0ms);
   transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 
 .app-tab:hover,
 .app-tab:focus-visible,
 .app-tab.is-active {
+  animation: appTabActive 0.4s ease forwards;
   transform: translateY(-4px) scale(1.01);
   border-color: rgba(107, 183, 255, 0.5);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 30px rgba(107, 183, 255, 0.15);
 }
 
 .app-logo {
@@ -700,13 +703,7 @@ body.void-modal-open {
 }
 
 .secure-logo::before {
-  content: '';
-  width: 26px;
-  height: 30px;
-  border-radius: 10px 10px 12px 12px;
-  border: 2px solid rgba(107, 183, 255, 0.8);
-  border-bottom-width: 3px;
-  display: block;
+  content: none;
 }
 
 .kernel-logo {
@@ -776,6 +773,14 @@ body.void-modal-open {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.app-launch:hover {
+  animation: launchPulse 0.6s ease;
+  background: linear-gradient(120deg, rgba(107, 183, 255, 0.35), rgba(107, 183, 255, 0.55));
+  box-shadow: 0 0 20px rgba(107, 183, 255, 0.3);
+  transform: scale(1.05);
 }
 
 .account-scrim {
@@ -958,6 +963,38 @@ body.void-modal-open {
 @keyframes panelPulse {
   from { opacity: 0.65; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes appTabHover {
+  0%, 100% {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 10px rgba(107, 183, 255, 0.05);
+  }
+  50% {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 20px rgba(107, 183, 255, 0.1);
+  }
+}
+
+@keyframes appTabActive {
+  0% {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 10px rgba(107, 183, 255, 0.05);
+  }
+  50% {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 30px rgba(107, 183, 255, 0.2);
+  }
+  100% {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 40px rgba(107, 183, 255, 0.25);
+  }
+}
+
+@keyframes launchPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(107, 183, 255, 0.3);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px 5px rgba(107, 183, 255, 0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,43 +1,37 @@
 (() => {
   const mount = document.getElementById('kernelMount');
   const statusEl = document.getElementById('kernelStatus');
-  const pageSelect = document.getElementById('kernelPageSelect');
-  const openTargetBtn = document.getElementById('kernelOpenTarget');
   if (!mount) return;
 
   const csrf = (document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '').trim();
-  let pageKey = String(pageSelect?.value || 'chats');
+  const editPageKey = 'linkup_kernel_edit_page';
+  let pageKey = 'chats';
   let kernelLoggedIn = false;
-  let visualMode = false;
-  let selectedEl = null;
+  let kernelUsername = '';
+
+  try {
+    const storedPage = localStorage.getItem(editPageKey);
+    if (storedPage) pageKey = storedPage;
+  } catch {}
+
+  try {
+    if (csrf) localStorage.setItem('linkup_kernel_csrf', csrf);
+  } catch {}
 
   const pageUrls = {
     chats: '/chats',
     dashboard: '/dashboard',
-    front: '/',
     support: '/support',
-    privacy: '/privacy',
-    terms: '/terms',
-    login: '/login',
-    register: '/register'
+    linkup_feedback: '/linkup/feedback'
   };
 
-  const WORKSPACE_KEY = 'linkup_kernel_workspaces';
-
-  function loadWorkspaces() {
-    try {
-      const raw = localStorage.getItem(WORKSPACE_KEY);
-      const data = raw ? JSON.parse(raw) : [];
-      return Array.isArray(data) ? data : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveWorkspaces(items) {
-    try {
-      localStorage.setItem(WORKSPACE_KEY, JSON.stringify(items || []));
-    } catch {}
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
   }
 
   function kernelFetch(url, payload) {
@@ -58,6 +52,7 @@
       const res = await fetch('/api/kernel/status', { credentials: 'same-origin' });
       const data = await res.json().catch(() => ({}));
       kernelLoggedIn = Boolean(data.kernel_logged_in);
+      kernelUsername = String(data.kernel_username || '').trim();
       if (statusEl) {
         statusEl.textContent = kernelLoggedIn ? 'Kernel session active.' : 'Kernel session not active.';
       }
@@ -70,6 +65,7 @@
   }
 
   function renderLogin() {
+    document.body.classList.add('kernel-auth');
     mount.innerHTML = `
       <div class="kernel-card">
         <strong>Kernel login</strong>
@@ -101,7 +97,7 @@
         setNotice('Logging in...', '');
         await kernelFetch('/api/kernel/login', { username, password });
         await loadStatus();
-        renderMain();
+        renderWelcome();
       } catch (e) {
         setNotice(e.message || 'Login failed', 'error');
       }
@@ -122,78 +118,129 @@
         setNotice('Creating kernel...', '');
         await kernelFetch('/api/kernel/register', { username, password });
         await loadStatus();
-        renderMain();
+        renderWelcome();
       } catch (e) {
         setNotice(e.message || 'Register failed', 'error');
       }
     });
   }
 
-  function renderMain() {
+  function renderWelcome() {
+    document.body.classList.remove('kernel-auth');
+    const name = kernelUsername ? escapeHtml(kernelUsername) : 'Creator';
     mount.innerHTML = `
       <div class="kernel-card">
-        <strong>Kernel session</strong>
+        <strong>Welcome, ${name}</strong>
+        <div class="kernel-hint">Choose how you want to build your UI changes.</div>
+        <div class="kernel-actions">
+          <button class="kernel-btn primary" id="kernelContinue">Continue</button>
+          <button class="kernel-btn" id="kernelLogout">Logout</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('kernelContinue')?.addEventListener('click', renderMethodChooser);
+    document.getElementById('kernelLogout')?.addEventListener('click', async () => {
+      try {
+        await kernelFetch('/api/kernel/logout', {});
+      } catch {}
+      kernelLoggedIn = false;
+      renderLogin();
+    });
+  }
+
+  function renderMethodChooser() {
+    document.body.classList.remove('kernel-auth');
+    mount.innerHTML = `
+      <div class="kernel-card">
+        <strong>Choose a method</strong>
+        <div class="kernel-hint">Visual edits are saved with keys. Developer mode is coming next.</div>
+        <div class="kernel-methods">
+          <div class="kernel-method-card">
+            <div>
+              <strong>Developer method</strong>
+              <div class="kernel-hint">Code-first editing (coming soon).</div>
+            </div>
+            <button class="kernel-btn" type="button" disabled>Developer</button>
+          </div>
+          <div class="kernel-method-card">
+            <div>
+              <strong>Visual method</strong>
+              <div class="kernel-hint">Click and edit UI without code.</div>
+            </div>
+            <button class="kernel-btn primary" type="button" id="kernelOpenVisual">Visual</button>
+          </div>
+        </div>
         <div class="kernel-actions">
           <button class="kernel-btn" id="kernelLogout">Logout</button>
         </div>
       </div>
+    `;
+
+    document.getElementById('kernelOpenVisual')?.addEventListener('click', renderVisualSetup);
+    document.getElementById('kernelLogout')?.addEventListener('click', async () => {
+      try {
+        await kernelFetch('/api/kernel/logout', {});
+      } catch {}
+      kernelLoggedIn = false;
+      renderLogin();
+    });
+  }
+
+  function renderVisualSetup() {
+    document.body.classList.remove('kernel-auth');
+    mount.innerHTML = `
       <div class="kernel-card">
-        <strong>Connect to LinkUp</strong>
-        <div class="kernel-row" style="margin-top:10px;">
-          <input class="kernel-input" id="linkupUser" placeholder="LinkUp username" />
-          <input class="kernel-input" id="linkupPass" type="password" placeholder="LinkUp password" />
-        </div>
+        <strong>Visual method</strong>
+        <div class="kernel-hint">Pick a LinkUp page to edit, preview it, then open the visual editor.</div>
         <div class="kernel-actions">
-          <button class="kernel-btn" id="kernelConnect">Connect</button>
-        </div>
-        <div class="kernel-hint">Connect to enable permanent per-user CSS.</div>
-      </div>
-      <div class="kernel-card">
-        <strong>Custom CSS (per user)</strong>
-        <textarea class="kernel-textarea" id="kernelCss"></textarea>
-        <div class="kernel-actions">
-          <select class="kernel-select" id="kernelSaveMode">
-            <option value="local">Save local</option>
-            <option value="permanent">Save permanent</option>
-          </select>
-          <button class="kernel-btn primary" id="kernelSave">Save</button>
-          <button class="kernel-btn" id="kernelApply">Apply local</button>
-        </div>
-        <div class="kernel-hint">Local uses browser cache; permanent requires connection.</div>
-      </div>
-      <div class="kernel-card">
-        <strong>Visual mode</strong>
-        <div class="kernel-actions">
-          <button class="kernel-btn" id="kernelVisual">Toggle visual</button>
-        </div>
-        <div class="kernel-hint">Click any element outside the kernel UI to move it.</div>
-      </div>
-      <div class="kernel-card">
-        <strong>Workspaces</strong>
-        <div class="kernel-hint">Create focused setups for different pages.</div>
-        <div class="kernel-actions" style="margin-top:8px;">
-          <button class="kernel-btn" id="kernelWorkspaceToggle" type="button">Create workspace</button>
-        </div>
-        <div class="kernel-workspace-form" id="kernelWorkspaceForm" hidden>
-          <input class="kernel-input" id="kernelWorkspaceName" placeholder="Workspace name" />
-          <select class="kernel-select" id="kernelWorkspacePage">
+          <select class="kernel-select" id="kernelEditPage">
             <option value="chats">Chats</option>
             <option value="dashboard">Dashboard</option>
-            <option value="front">Front</option>
             <option value="support">Support</option>
-            <option value="privacy">Privacy</option>
-            <option value="terms">Terms</option>
-            <option value="login">Login</option>
-            <option value="register">Register</option>
+            <option value="linkup_feedback">Feedback</option>
           </select>
-          <div class="kernel-actions">
-            <button class="kernel-btn primary" id="kernelWorkspaceSave" type="button">Save</button>
-            <button class="kernel-btn" id="kernelWorkspaceCancel" type="button">Cancel</button>
-          </div>
+          <button class="kernel-btn" id="kernelPreviewPage" type="button">Preview</button>
+          <button class="kernel-btn primary" id="kernelVisualOpen" type="button">Open editor</button>
         </div>
-        <div class="kernel-workspace-list" id="kernelWorkspaceList"></div>
+        <div class="kernel-actions">
+          <button class="kernel-btn" id="kernelBackMethods" type="button">Back</button>
+          <button class="kernel-btn" id="kernelLogout" type="button">Logout</button>
+        </div>
+      </div>
+      <div class="kernel-card">
+        <strong>Publish key</strong>
+        <div class="kernel-hint">Use the visual editor to save and generate a key for LinkUp settings.</div>
+      </div>
+      <div class="kernel-card">
+        <strong>History</strong>
+        <div class="kernel-history" id="kernelHistoryList">Loading history...</div>
       </div>
     `;
+
+    const editPageSelect = document.getElementById('kernelEditPage');
+    if (editPageSelect) {
+      editPageSelect.value = pageKey;
+      if (!editPageSelect.value) editPageSelect.value = 'chats';
+    }
+
+    editPageSelect?.addEventListener('change', () => {
+      pageKey = String(editPageSelect.value || pageKey || 'chats');
+    });
+
+    document.getElementById('kernelPreviewPage')?.addEventListener('click', () => {
+      const target = String(editPageSelect?.value || pageKey);
+      pageKey = target;
+      openTargetPage(false);
+    });
+
+    document.getElementById('kernelVisualOpen')?.addEventListener('click', () => {
+      const target = String(editPageSelect?.value || pageKey);
+      pageKey = target;
+      openTargetPage(true);
+    });
+
+    document.getElementById('kernelBackMethods')?.addEventListener('click', renderMethodChooser);
 
     document.getElementById('kernelLogout')?.addEventListener('click', async () => {
       try {
@@ -203,220 +250,100 @@
       renderLogin();
     });
 
-    document.getElementById('kernelConnect')?.addEventListener('click', async () => {
-      const username = (document.getElementById('linkupUser')?.value || '').trim();
-      const password = (document.getElementById('linkupPass')?.value || '').trim();
-      try {
-        await kernelFetch('/api/kernel/connect', { username, password });
-        alert('Connected. Permanent saves enabled.');
-      } catch (e) {
-        alert(e.message || 'Connect failed');
-      }
-    });
+    loadHistory();
+  }
 
-    document.getElementById('kernelApply')?.addEventListener('click', () => {
-      const css = String(document.getElementById('kernelCss')?.value || '');
-      applyLocalCss(css);
-      saveLocalCss(css);
-    });
-
-    document.getElementById('kernelSave')?.addEventListener('click', async () => {
-      const css = String(document.getElementById('kernelCss')?.value || '').trim();
-      const mode = String(document.getElementById('kernelSaveMode')?.value || 'local');
-      try {
-        const data = await kernelFetch('/api/kernel/css/save', { page: pageKey, css, mode });
-        if (data.saved === 'local') saveLocalCss(css);
-        applyLocalCss(css);
-        alert('Saved.');
-      } catch (e) {
-        alert(e.message || 'Save failed');
-      }
-    });
-
-    document.getElementById('kernelVisual')?.addEventListener('click', () => {
-      if (visualMode) {
-        disableVisualMode();
-      } else {
-        enableVisualMode();
-      }
-    });
-
-    const workspaceForm = document.getElementById('kernelWorkspaceForm');
-    const workspaceList = document.getElementById('kernelWorkspaceList');
-    const workspaceName = document.getElementById('kernelWorkspaceName');
-    const workspacePage = document.getElementById('kernelWorkspacePage');
-
-    function renderWorkspaces() {
-      const items = loadWorkspaces();
-      if (!workspaceList) return;
-      if (!items.length) {
-        workspaceList.innerHTML = '<div class="kernel-muted">No workspaces yet.</div>';
-        return;
-      }
-      workspaceList.innerHTML = items.map((item) => {
-        const label = String(item.name || 'Workspace');
-        const page = String(item.page || 'chats');
-        return `
-          <div class="kernel-workspace">
-            <div>
-              <strong>${label}</strong>
-              <div class="kernel-muted">Page: ${page}</div>
-            </div>
-            <div class="kernel-actions">
-              <button class="kernel-btn" data-action="open" data-page="${page}">Open</button>
-              <button class="kernel-btn" data-action="select" data-page="${page}">Select</button>
-            </div>
-          </div>
-        `;
-      }).join('');
+  function openTargetPage(visual) {
+    const baseUrl = pageUrls[pageKey] || '/chats';
+    const url = new URL(baseUrl, window.location.origin);
+    try { localStorage.setItem(editPageKey, pageKey); } catch {}
+    if (visual) {
+      try { localStorage.setItem('linkup_kernel_visual', '1'); } catch {}
+      url.searchParams.set('kernel_default', '1');
     }
-
-    document.getElementById('kernelWorkspaceToggle')?.addEventListener('click', () => {
-      if (!workspaceForm) return;
-      workspaceForm.hidden = !workspaceForm.hidden;
-      if (!workspaceForm.hidden && workspaceName) workspaceName.focus();
-    });
-
-    document.getElementById('kernelWorkspaceCancel')?.addEventListener('click', () => {
-      if (!workspaceForm) return;
-      workspaceForm.hidden = true;
-      if (workspaceName) workspaceName.value = '';
-    });
-
-    document.getElementById('kernelWorkspaceSave')?.addEventListener('click', () => {
-      const name = String(workspaceName?.value || '').trim();
-      const page = String(workspacePage?.value || 'chats');
-      if (!name) {
-        alert('Workspace name is required.');
-        return;
-      }
-      const items = loadWorkspaces();
-      items.unshift({
-        id: `ws_${Date.now()}`,
-        name,
-        page,
-        created_at: Date.now()
-      });
-      saveWorkspaces(items.slice(0, 20));
-      if (workspaceName) workspaceName.value = '';
-      if (workspaceForm) workspaceForm.hidden = true;
-      renderWorkspaces();
-    });
-
-    workspaceList?.addEventListener('click', (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      const action = target.getAttribute('data-action');
-      const page = target.getAttribute('data-page') || 'chats';
-      if (action === 'open') {
-        const url = pageUrls[page] || '/chats';
-        window.open(url, '_blank', 'noopener');
-      }
-      if (action === 'select') {
-        if (pageSelect) pageSelect.value = page;
-        pageKey = page;
-        hydrateCss();
-      }
-    });
-
-    renderWorkspaces();
-
-    hydrateCss();
+    window.open(url.toString(), '_blank', 'noopener');
   }
 
-  function localKey() {
-    return `linkup_kernel_css:${pageKey}`;
-  }
-
-  function saveLocalCss(css) {
-    try { localStorage.setItem(localKey(), css); } catch {}
-  }
-
-  function loadLocalCss() {
-    try { return localStorage.getItem(localKey()) || ''; } catch { return ''; }
-  }
-
-  function applyLocalCss(css) {
-    let el = document.getElementById('kernelStyle');
-    if (!el) {
-      el = document.createElement('style');
-      el.id = 'kernelStyle';
-      document.head.appendChild(el);
-    }
-    el.textContent = css || '';
-  }
-
-  async function hydrateCss() {
-    const local = loadLocalCss();
-    if (local) {
-      applyLocalCss(local);
-      const input = document.getElementById('kernelCss');
-      if (input) input.value = local;
-    }
+  async function loadHistory() {
+    const host = document.getElementById('kernelHistoryList');
+    if (!host) return;
+    host.textContent = 'Loading history...';
     try {
-      const res = await fetch(`/api/kernel/css?page=${encodeURIComponent(pageKey)}`, { credentials: 'same-origin' });
+      const res = await fetch('/api/kernel/key/history', { credentials: 'same-origin' });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.css) {
-        applyLocalCss(data.css);
-        const input = document.getElementById('kernelCss');
-        if (input) input.value = data.css;
+      if (!res.ok) throw new Error(data.error || 'Unable to load');
+      const items = Array.isArray(data.items) ? data.items : [];
+      if (!items.length) {
+        host.textContent = 'No keys yet.';
+        return;
       }
-    } catch {}
-  }
+      host.innerHTML = items.map((item) => `
+        <div class="kernel-history-row" data-id="${escapeHtml(item.id)}">
+          <div>
+            <strong>${escapeHtml(item.page || 'page')}</strong>
+            <div class="kernel-hint">${escapeHtml(item.created_at || '')}</div>
+          </div>
+          <button class="kernel-btn" type="button" data-action="reveal">Reveal</button>
+          <button class="kernel-btn" type="button" data-action="copy" disabled>Copy</button>
+        </div>
+      `).join('');
 
-  function enableVisualMode() {
-    visualMode = true;
-    document.body.classList.add('kernel-visual-active');
-    document.addEventListener('click', onVisualClick, true);
-  }
+      host.querySelectorAll('[data-action="reveal"]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const row = btn.closest('.kernel-history-row');
+          const keyId = row?.getAttribute('data-id');
+          if (!keyId) return;
+          const password = window.prompt('Kernel password');
+          if (!password) return;
+          try {
+            const data = await kernelFetch('/api/kernel/key/reveal', { id: keyId, password });
+            const keyEl = row?.querySelector('.kernel-history-key');
+            if (keyEl) {
+              keyEl.textContent = data.key || '';
+            } else {
+              const span = document.createElement('div');
+              span.className = 'kernel-history-key';
+              span.textContent = data.key || '';
+              row?.appendChild(span);
+            }
+            const copyBtn = row?.querySelector('[data-action="copy"]');
+            if (copyBtn) copyBtn.disabled = !data.key;
+          } catch (e) {
+            alert(e.message || 'Reveal failed');
+          }
+        });
+      });
 
-  function disableVisualMode() {
-    visualMode = false;
-    document.body.classList.remove('kernel-visual-active');
-    document.removeEventListener('click', onVisualClick, true);
-    if (selectedEl) selectedEl.classList.remove('kernel-highlight');
-    selectedEl = null;
-  }
-
-  function onVisualClick(ev) {
-    const target = ev.target;
-    if (!(target instanceof HTMLElement)) return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    if (selectedEl) selectedEl.classList.remove('kernel-highlight');
-    selectedEl = target;
-    selectedEl.classList.add('kernel-highlight');
-    const rect = selectedEl.getBoundingClientRect();
-    const posCss = `#${ensureKernelId(selectedEl)} { position: fixed; left: ${Math.round(rect.left)}px; top: ${Math.round(rect.top)}px; }`;
-    const input = document.getElementById('kernelCss');
-    if (input) {
-      input.value = (input.value || '') + `\n${posCss}`.trim();
+      host.querySelectorAll('[data-action="copy"]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const row = btn.closest('.kernel-history-row');
+          const key = row?.querySelector('.kernel-history-key')?.textContent || '';
+          if (!key) return;
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(key);
+            } else {
+              const tmp = document.createElement('input');
+              tmp.value = key;
+              document.body.appendChild(tmp);
+              tmp.select();
+              document.execCommand('copy');
+              tmp.remove();
+            }
+            alert('Key copied.');
+          } catch {
+            alert('Copy failed.');
+          }
+        });
+      });
+    } catch (e) {
+      host.textContent = e.message || 'Unable to load history.';
     }
-    applyLocalCss(input?.value || '');
   }
-
-  function ensureKernelId(el) {
-    if (el.id) return el.id;
-    const id = `kernel_${Math.random().toString(36).slice(2, 8)}`;
-    el.id = id;
-    return id;
-  }
-
-  function openTargetPage() {
-    const url = pageUrls[pageKey] || '/chats';
-    window.open(url, '_blank', 'noopener');
-  }
-
-  pageSelect?.addEventListener('change', () => {
-    pageKey = String(pageSelect.value || 'chats');
-    hydrateCss();
-  });
-
-  openTargetBtn?.addEventListener('click', openTargetPage);
 
   loadStatus().then(() => {
     if (kernelLoggedIn) {
-      renderMain();
+      renderWelcome();
     } else {
       renderLogin();
     }

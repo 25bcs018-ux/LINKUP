@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Creator logo">
+  <defs>
+    <linearGradient id="creatorGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e9f7ff" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#bdf0ff" stop-opacity="0.7" />
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="14" fill="none" stroke="url(#creatorGlow)" stroke-width="3" opacity="0.85" />
+  <path d="M20 34c0 6 4.8 10 12 10s12-4 12-10" fill="none" stroke="#e9f7ff" stroke-width="4" stroke-linecap="round" />
+  <path d="M24 26c2-4.8 6.2-7.2 12-7.2s10 2.4 12 7.2" fill="none" stroke="#c7f2ff" stroke-width="4" stroke-linecap="round" />
+  <circle cx="22" cy="32" r="5" fill="#e9f7ff" />
+  <circle cx="42" cy="32" r="5" fill="#e9f7ff" />
+  <path d="M30 32h4" stroke="#e9f7ff" stroke-width="3" stroke-linecap="round" opacity="0.85" />
+</svg>

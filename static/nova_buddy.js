@@ -1,6 +1,9 @@
 (() => {
   const buddyKey = 'linkup_nova_buddy';
   const context = (document.body?.dataset?.novaContext || '').trim() || 'general';
+  const guestContexts = new Set(['front', 'auth', 'legal', 'support', 'verify', 'secure', 'general']);
+  const buddyContexts = new Set([...guestContexts, 'chat', 'dashboard']);
+  const isGuestContext = guestContexts.has(context);
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   let buddyEl = null;
@@ -280,6 +283,12 @@
     try {
       if (bubbleInputEl) bubbleInputEl.value = '';
 
+      if (isGuestContext) {
+        const reply = respondGuestBuddy(value);
+        updateThreadMessage(thinkingIndex, reply);
+        return;
+      }
+
       const headers = { 'Content-Type': 'application/json' };
       const csrf = (document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '').trim();
       if (csrf) headers['X-CSRF-Token'] = csrf;
@@ -304,6 +313,47 @@
     } finally {
       if (bubbleSendEl) bubbleSendEl.disabled = false;
     }
+  }
+
+  function respondGuestBuddy(text) {
+    const t = String(text || '').toLowerCase().trim();
+    const replies = [
+      {
+        test: (v) => v.includes('what is linkup') || v.includes('what is link up') || v.includes('linkup?'),
+        reply: 'LinkUp is a fast, simple chat app for everyday conversations.'
+      },
+      {
+        test: (v) => v.includes('create') && v.includes('account'),
+        reply: 'Tap "Create account" and fill in a username, email, and password.'
+      },
+      {
+        test: (v) => v.includes('sign in') || v.includes('login'),
+        reply: 'Use your username or email and password to sign in.'
+      },
+      {
+        test: (v) => v.includes('privacy'),
+        reply: 'You can read the privacy summary on the Privacy page.'
+      },
+      {
+        test: (v) => v.includes('terms') || v.includes('policy'),
+        reply: 'The Terms page has the key rules and usage guidelines.'
+      },
+      {
+        test: (v) => v.includes('secure'),
+        reply: 'LinkUp Secure lets you create or join a protected chat space.'
+      },
+      {
+        test: (v) => v.includes('creator'),
+        reply: 'Creator is the studio for layouts and visual changes.'
+      },
+      {
+        test: (v) => v.includes('support') || v.includes('help'),
+        reply: 'Open Support to report an issue or get troubleshooting steps.'
+      }
+    ];
+    const matched = replies.find((entry) => entry.test(t));
+    if (matched) return matched.reply;
+    return 'I am in guest mode. Ask about LinkUp, login, accounts, privacy, or secure mode.';
   }
 
   async function submitGuestMessage(content) {
@@ -508,6 +558,11 @@
   }
 
   function initBuddy() {
+    if (!buddyContexts.has(context)) {
+      persistBuddyEnabled(false);
+      cleanupBuddy();
+      return;
+    }
     if (!isBuddyEnabled()) {
       persistBuddyEnabled(false);
       cleanupBuddy();

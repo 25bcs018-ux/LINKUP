@@ -530,6 +530,16 @@ class KernelCss(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
 
+class KernelKey(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    kernel_account_id = db.Column(db.Integer, db.ForeignKey('kernel_account.id'), nullable=False)
+    page_key = db.Column(db.String(80), nullable=False)
+    key_value = db.Column(db.String(64), unique=True, nullable=False)
+    css_text = db.Column(db.Text, nullable=False, default='')
+    js_text = db.Column(db.Text, nullable=False, default='')
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+
 # Create tables early for entrypoints like `flask run`.
 _ensure_db_create_all()
 
@@ -947,7 +957,7 @@ def _ensure_group_image_columns() -> None:
     """Best-effort SQLite migration for group image fields."""
     try:
         with app.app_context():
-            cols = [r[1] for r in db.session.execute(text('PRAGMA table_info(group)')).fetchall()]
+            cols = [r[1] for r in db.session.execute(text('PRAGMA table_info("group")')).fetchall()]
             if not cols:
                 return
 
@@ -2959,7 +2969,7 @@ def register_page():
 def login():
     if request.method == 'POST':
         identifier = (request.form.get('username') or '').strip()
-        password = request.form.get('password')
+        password = request.form.get('password') or ''
         next_dest = (request.form.get('next') or '').strip().lower()
         using_void = next_dest == 'void_hub'
 
@@ -2967,7 +2977,7 @@ def login():
         if not user and '@' in identifier:
             user = _find_user_by_email(identifier)
         
-        if user and check_password_hash(user.password, password):
+        if user and user.password and check_password_hash(user.password, password):
             if _email_verification_required() and not getattr(user, 'email_verified', False):
                 return redirect(url_for('email_not_verified', username=user.username))
             _login_user(user)
@@ -3507,10 +3517,13 @@ def chats():
     # NOVA is accessed via the floating widget (not shown in sidebar).
 
     # Groups sidebar
-    group_ids = [gm.group_id for gm in GroupMember.query.filter_by(user_id=me.id).all()]
-    groups = []
-    if group_ids:
-        groups = Group.query.filter(Group.id.in_(group_ids)).order_by(Group.created_at.desc()).all()
+    groups = (
+        db.session.query(Group)
+        .join(GroupMember, Group.id == GroupMember.group_id)
+        .filter(GroupMember.user_id == me.id)
+        .order_by(Group.created_at.desc())
+        .all()
+    )
 
     group_id_raw = (request.args.get('g') or request.args.get('group') or '').strip()
     active_group = None
@@ -3637,17 +3650,11 @@ def api_group_messages_get(group_id: int):
     )
 
     sender_ids = sorted({m.sender_id for m in msgs}) if msgs else []
-    senders = {}
-    if sender_ids:
-        for u in User.query.filter(User.id.in_(sender_ids)).all():
-            senders[u.id] = u.username
+    senders = {u.id: u.username for u in User.query.filter(User.id.in_(sender_ids)).all()} if sender_ids else {}
 
     # Reply preview (within group)
     reply_ids = sorted({int(m.reply_to_id) for m in msgs if getattr(m, 'reply_to_id', None)})
-    replied: dict[int, GroupMessage] = {}
-    if reply_ids:
-        for rm in GroupMessage.query.filter(GroupMessage.id.in_(reply_ids)).all():
-            replied[int(rm.id)] = rm
+    replied: dict[int, GroupMessage] = {rm.id: rm for rm in GroupMessage.query.filter(GroupMessage.id.in_(reply_ids)).all()} if reply_ids else {}
 
     latest_visible_message_id = int(msgs[-1].id) if msgs else None
     _mark_group_chat_read(me.id, int(group_id), latest_visible_message_id)
@@ -4214,6 +4221,22 @@ def api_account_me():
     })
 
 
+@app.route('/api/account/verify-password', methods=['POST'])
+def api_account_verify_password():
+    me = _get_me()
+    if not me:
+        return jsonify({'error': 'not_authenticated'}), 401
+    payload = request.get_json(silent=True) or {}
+    password = (payload.get('password') or '').strip()
+    if not password:
+        return jsonify({'error': 'missing_password'}), 400
+    if not check_password_hash(me.password, password):
+        return jsonify({'error': 'invalid_password'}), 401
+    session['linkup_pw_verified'] = True
+    session['linkup_pw_verified_at'] = _utcnow().isoformat() + 'Z'
+    return jsonify({'ok': True})
+
+
 @app.route('/api/kernel/status', methods=['GET'])
 def api_kernel_status():
     acct = _get_kernel_account()
@@ -4343,6 +4366,130 @@ def api_kernel_css_save():
         db.session.add(row)
     db.session.commit()
     return jsonify({'ok': True, 'saved': 'permanent'})
+
+
+def _kernel_allowed_pages() -> set[str]:
+    return {
+        'chats',
+        'dashboard',
+        'support',
+        'linkup_feedback',
+    }
+
+
+def _kernel_normalize_page_key(raw: str) -> str:
+    key = (raw or '').strip().lower()
+    return key if key in _kernel_allowed_pages() else ''
+
+
+@app.route('/api/kernel/key/create', methods=['POST'])
+def api_kernel_key_create():
+    acct = _get_kernel_account()
+    if not acct:
+        return jsonify({'error': 'kernel_not_authenticated'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    page_key = _kernel_normalize_page_key(payload.get('page') or '')
+    css_text = (payload.get('css') or '').strip()
+    js_text = (payload.get('js') or '').strip()
+    if not page_key:
+        return jsonify({'error': 'invalid_page'}), 400
+    if len(css_text) > 20000 or len(js_text) > 20000:
+        return jsonify({'error': 'payload_too_large'}), 400
+
+    key_value = ''
+    for _ in range(6):
+        candidate = secrets.token_urlsafe(18)
+        if not KernelKey.query.filter_by(key_value=candidate).first():
+            key_value = candidate
+            break
+    if not key_value:
+        return jsonify({'error': 'key_generation_failed'}), 500
+
+    row = KernelKey(
+        kernel_account_id=int(acct.id),
+        page_key=page_key,
+        key_value=key_value,
+        css_text=css_text,
+        js_text=js_text,
+    )
+    db.session.add(row)
+    db.session.commit()
+    return jsonify({'ok': True, 'key': key_value, 'page': page_key})
+
+
+@app.route('/api/kernel/key/peek', methods=['GET'])
+def api_kernel_key_peek():
+    key_value = (request.args.get('key') or '').strip()
+    if not key_value:
+        return jsonify({'error': 'missing_key'}), 400
+    row = KernelKey.query.filter_by(key_value=key_value).first()
+    if not row:
+        return jsonify({'error': 'key_not_found'}), 404
+    return jsonify({
+        'ok': True,
+        'page': row.page_key,
+        'created_at': row.created_at.isoformat() + 'Z',
+    })
+
+
+@app.route('/api/kernel/key/apply', methods=['GET'])
+def api_kernel_key_apply():
+    key_value = (request.args.get('key') or '').strip()
+    page_key = _kernel_normalize_page_key(request.args.get('page') or '')
+    if not key_value or not page_key:
+        return jsonify({'error': 'missing_key_or_page'}), 400
+    row = KernelKey.query.filter_by(key_value=key_value).first()
+    if not row:
+        return jsonify({'error': 'key_not_found'}), 404
+    if row.page_key != page_key:
+        return jsonify({'error': 'page_mismatch'}), 403
+    return jsonify({
+        'ok': True,
+        'page': row.page_key,
+        'css': row.css_text or '',
+        'js': row.js_text or '',
+    })
+
+
+@app.route('/api/kernel/key/history', methods=['GET'])
+def api_kernel_key_history():
+    acct = _get_kernel_account()
+    if not acct:
+        return jsonify({'error': 'kernel_not_authenticated'}), 401
+    rows = (
+        KernelKey.query.filter_by(kernel_account_id=acct.id)
+        .order_by(KernelKey.created_at.desc(), KernelKey.id.desc())
+        .limit(60)
+        .all()
+    )
+    items = [
+        {
+            'id': int(row.id),
+            'page': row.page_key,
+            'created_at': row.created_at.isoformat() + 'Z',
+        }
+        for row in rows
+    ]
+    return jsonify({'ok': True, 'items': items})
+
+
+@app.route('/api/kernel/key/reveal', methods=['POST'])
+def api_kernel_key_reveal():
+    acct = _get_kernel_account()
+    if not acct:
+        return jsonify({'error': 'kernel_not_authenticated'}), 401
+    payload = request.get_json(silent=True) or {}
+    key_id = payload.get('id')
+    password = (payload.get('password') or '').strip()
+    if not key_id or not password:
+        return jsonify({'error': 'missing_credentials'}), 400
+    if not check_password_hash(acct.password_hash, password):
+        return jsonify({'error': 'invalid_credentials'}), 401
+    row = KernelKey.query.filter_by(id=key_id, kernel_account_id=acct.id).first()
+    if not row:
+        return jsonify({'error': 'key_not_found'}), 404
+    return jsonify({'ok': True, 'key': row.key_value, 'page': row.page_key})
 
 
 @app.route('/api/users/<string:username>/public', methods=['GET'])
@@ -4889,7 +5036,6 @@ def api_account_delete():
     return jsonify({'ok': True, 'redirect': url_for('front')})
 
 
-@app.route('/support', methods=['GET', 'POST'])
 def _support_app_meta(app_key: str):
     key = (app_key or '').strip().lower()
     if key == 'linkup':
@@ -5550,8 +5696,12 @@ def api_get_messages(other_username: str):
         .all()
     )
 
-    if msgs:
-        ids = [m.id for m in msgs]
+    ids = [m.id for m in msgs] if msgs else []
+    deleted_ids: set[int] = set()
+    starred_ids: set[int] = set()
+    pinned_ids: set[int] = set()
+
+    if ids:
         deleted_ids = {
             d.message_id
             for d in MessageDeletion.query
@@ -5560,29 +5710,24 @@ def api_get_messages(other_username: str):
         }
         if deleted_ids:
             msgs = [m for m in msgs if m.id not in deleted_ids]
+            ids = [m.id for m in msgs]
 
-    ids = [m.id for m in msgs] if msgs else []
-    starred_ids: set[int] = set()
-    pinned_ids: set[int] = set()
-    if ids:
-        starred_ids = {
-            s.message_id
-            for s in MessageStar.query
-            .filter(MessageStar.user_id == me.id, MessageStar.message_id.in_(ids))
-            .all()
-        }
-        pinned_ids = {
-            p.message_id
-            for p in MessagePin.query
-            .filter(MessagePin.user_id == me.id, MessagePin.message_id.in_(ids))
-            .all()
-        }
+        if ids:
+            starred_ids = {
+                s.message_id
+                for s in MessageStar.query
+                .filter(MessageStar.user_id == me.id, MessageStar.message_id.in_(ids))
+                .all()
+            }
+            pinned_ids = {
+                p.message_id
+                for p in MessagePin.query
+                .filter(MessagePin.user_id == me.id, MessagePin.message_id.in_(ids))
+                .all()
+            }
 
     reply_ids = sorted({int(m.reply_to_id) for m in msgs if getattr(m, 'reply_to_id', None)})
-    replied: dict[int, Message] = {}
-    if reply_ids:
-        for rm in Message.query.filter(Message.id.in_(reply_ids)).all():
-            replied[int(rm.id)] = rm
+    replied: dict[int, Message] = {rm.id: rm for rm in Message.query.filter(Message.id.in_(reply_ids)).all()} if reply_ids else {}
 
     latest_visible_message_id = int(msgs[-1].id) if msgs else None
     if not is_self:
@@ -5670,30 +5815,72 @@ def api_chats_sidebar():
         int(s.other_user_id): s for s in DirectChatState.query.filter_by(user_id=int(me.id)).all()
     }
 
-    direct_items = []
-    for other in users:
-        last_msg = (
-            Message.query
+    other_ids = [int(u.id) for u in users]
+    last_messages = {}
+    if other_ids:
+        subq = (
+            db.session.query(
+                Message.id,
+                Message.sender_id,
+                Message.recipient_id,
+                Message.content,
+                Message.created_at,
+                Message.deleted_for_all,
+                db.func.max(Message.id).over(
+                    partition_by=[
+                        db.case(
+                            (Message.sender_id == me.id, Message.recipient_id),
+                            else_=Message.sender_id
+                        )
+                    ]
+                ).label('max_id')
+            )
             .filter(
                 db.or_(
-                    db.and_(Message.sender_id == me.id, Message.recipient_id == other.id),
-                    db.and_(Message.sender_id == other.id, Message.recipient_id == me.id),
+                    db.and_(Message.sender_id == me.id, Message.recipient_id.in_(other_ids)),
+                    db.and_(Message.sender_id.in_(other_ids), Message.recipient_id == me.id),
                 )
             )
-            .order_by(Message.created_at.desc(), Message.id.desc())
-            .first()
+            .subquery()
         )
+        last_messages = {
+            int(m.recipient_id if m.sender_id == me.id else m.sender_id): m
+            for m in db.session.query(subq).filter(subq.c.id == subq.c.max_id).all()
+        }
+
+    unread_counts = {}
+    if other_ids:
+        subq = (
+            db.session.query(
+                db.case(
+                    (Message.sender_id == me.id, Message.recipient_id),
+                    else_=Message.sender_id
+                ).label('other_id'),
+                db.func.count(Message.id).label('cnt')
+            )
+            .filter(
+                Message.sender_id.in_(other_ids),
+                Message.recipient_id == me.id,
+                Message.deleted_for_all == False,
+                ~Message.id.in_(deleted_subq) if deleted_subq is not None else True
+            )
+            .group_by(
+                db.case(
+                    (Message.sender_id == me.id, Message.recipient_id),
+                    else_=Message.sender_id
+                )
+            )
+            .subquery()
+        )
+        for row in db.session.query(subq).all():
+            unread_counts[int(row.other_id)] = int(row.cnt)
+
+    direct_items = []
+    for other in users:
+        last_msg = last_messages.get(int(other.id))
         state = direct_states.get(int(other.id))
         last_read_message_id = int(state.last_read_message_id or 0) if state else 0
-        unread_query = Message.query.filter(
-            Message.sender_id == other.id,
-            Message.recipient_id == me.id,
-            Message.deleted_for_all == False,
-            Message.id > last_read_message_id,
-        )
-        if deleted_subq is not None:
-            unread_query = unread_query.filter(~Message.id.in_(deleted_subq))
-        unread_count = unread_query.count()
+        unread_count = unread_counts.get(int(other.id), 0)
 
         preview = ''
         created_at = ''
@@ -5727,31 +5914,64 @@ def api_chats_sidebar():
     direct_items.sort(key=lambda item: (0 if int(item['unread_count']) > 0 else 1, -(int(item['last_message_id']) or 0), str(item['username']).lower()))
 
     group_ids = [int(gm.group_id) for gm in GroupMember.query.filter_by(user_id=me.id).all()]
-    groups = Group.query.filter(Group.id.in_(group_ids)).all() if group_ids else []
+    groups = (
+        db.session.query(Group)
+        .join(GroupMember, Group.id == GroupMember.group_id)
+        .filter(GroupMember.user_id == me.id)
+        .all()
+    )
+
     group_states = {
         int(s.group_id): s for s in GroupChatState.query.filter_by(user_id=int(me.id)).all()
     }
 
+    last_group_messages = {}
+    group_unread_counts = {}
+
+    if group_ids:
+        last_msgs = (
+            db.session.query(
+                GroupMessage.group_id,
+                GroupMessage.id,
+                GroupMessage.sender_id,
+                GroupMessage.content,
+                GroupMessage.created_at,
+                GroupMessage.deleted_for_all,
+                db.func.row_number().over(
+                    partition_by=[GroupMessage.group_id],
+                    order_by=[GroupMessage.created_at.desc(), GroupMessage.id.desc()]
+                ).label('rn')
+            )
+            .filter(GroupMessage.group_id.in_(group_ids))
+            .subquery()
+        )
+        for msg in db.session.query(last_msgs).filter(last_msgs.c.rn == 1).all():
+            last_group_messages[int(msg.group_id)] = msg
+
+        unread_subq = (
+            db.session.query(
+                GroupMessage.group_id,
+                db.func.count(GroupMessage.id).label('cnt')
+            )
+            .filter(
+                GroupMessage.group_id.in_(group_ids),
+                GroupMessage.sender_id != me.id,
+                GroupMessage.deleted_for_all == False,
+                GroupMessage.id > db.select(
+                    db.func.coalesce(GroupChatState.last_read_message_id, 0)
+                ).where(GroupChatState.group_id == GroupMessage.group_id, GroupChatState.user_id == me.id).correlate(GroupMessage).scalar_subquery()
+            )
+            .group_by(GroupMessage.group_id)
+            .subquery()
+        )
+        for row in db.session.query(unread_subq).all():
+            group_unread_counts[int(row.group_id)] = int(row.cnt)
+
     group_items = []
     for group in groups:
-        last_group_msg = (
-            GroupMessage.query
-            .filter(GroupMessage.group_id == int(group.id))
-            .order_by(GroupMessage.created_at.desc(), GroupMessage.id.desc())
-            .first()
-        )
+        last_group_msg = last_group_messages.get(int(group.id))
         state = group_states.get(int(group.id))
-        last_read_message_id = int(state.last_read_message_id or 0) if state else 0
-        unread_count = (
-            GroupMessage.query
-            .filter(
-                GroupMessage.group_id == int(group.id),
-                GroupMessage.sender_id != int(me.id),
-                GroupMessage.deleted_for_all == False,
-                GroupMessage.id > last_read_message_id,
-            )
-            .count()
-        )
+        unread_count = group_unread_counts.get(int(group.id), 0)
 
         preview = ''
         created_at = ''

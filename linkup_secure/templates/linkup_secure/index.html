@@ -14,15 +14,18 @@
     <link rel="manifest" href="{{ url_for('linkup_secure.secure_manifest') }}" />
     <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
     <link rel="stylesheet" href="{{ url_for('linkup_secure.static', filename='secure.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='void_launch.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='app_switcher.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
     <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body data-nova-context="secure">
+<body data-nova-context="secure" data-void-launch-app="secure" data-void-launch-target=".brand .brand-mark">
     <div class="page-shell">
         <header class="topbar">
             <a class="brand" href="{{ url_for('front') }}" aria-label="Return to main home">
-                <span class="brand-mark" aria-hidden="true"></span>
+                <span class="brand-mark" aria-hidden="true">
+                    <img class="brand-logo" src="{{ url_for('static', filename='brand/secure-logo.svg') }}" alt="" />
+                </span>
                 <span>Secure</span>
             </a>
             <nav class="top-actions" aria-label="Secure navigation">
@@ -41,7 +44,9 @@
                     <div class="heading-row">
                         <h1>Enter a dedicated space for protected communication.</h1>
                         <a class="heading-symbol" href="{{ url_for('linkup_secure.link') }}" aria-label="Open Link page">
-                            <span class="brand-mark heading-mark" aria-hidden="true"></span>
+                            <span class="brand-mark heading-mark" aria-hidden="true">
+                                <img class="heading-logo" src="{{ url_for('static', filename='brand/secure-logo.svg') }}" alt="" />
+                            </span>
                             <span class="symbol-link">Link</span>
                         </a>
                     </div>
@@ -91,6 +96,7 @@
     <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
     <script defer src="{{ url_for('static', filename='app_switcher.js') }}"></script>
     <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='void_launch.js') }}"></script>
     <script>
         (() => {
             const trigger = document.querySelector('.heading-symbol');

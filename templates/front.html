@@ -17,10 +17,11 @@
     <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='front.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='void_launch.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='app_switcher.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='nova.css') }}" />
 </head>
-<body class="bg-animated" data-nova-context="front">
+<body class="bg-animated" data-nova-context="front" data-void-launch-app="linkup" data-void-launch-target=".brand .logo">
     <div class="page">
         <header>
             <div class="wrap nav">
@@ -121,6 +122,7 @@
     <script defer src="{{ url_for('static', filename='nova_buddy.js') }}"></script>
     <script defer src="{{ url_for('static', filename='nova.js') }}"></script>
     <script defer src="{{ url_for('static', filename='kernel_runtime.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='void_launch.js') }}"></script>
     <script defer src="{{ url_for('static', filename='app_switcher.js') }}"></script>
     <script defer src="{{ url_for('static', filename='pwa-register.js') }}"></script>
 </body>

@@ -1321,6 +1321,23 @@
       });
     }
 
+    function applyGroupUnreadBadges(groupItems) {
+      const byGroup = new Map();
+      for (const item of (Array.isArray(groupItems) ? groupItems : [])) {
+        const gid = String(item?.group_id ?? '').trim();
+        if (!gid) continue;
+        byGroup.set(gid, Math.max(0, Number(item?.unread_count) || 0));
+      }
+
+      chatList?.querySelectorAll?.('.chat.group-chat[data-group-id]')?.forEach?.((el) => {
+        const gid = String(el.getAttribute('data-group-id') || '').trim();
+        if (!gid) return;
+        let unread = byGroup.get(gid) || 0;
+        if (activeKind === 'group' && String(activeGroupId || '') === gid) unread = 0;
+        setUnreadBadgeCount(el, unread);
+      });
+    }
+
     function reorderDirectChatsByUnread(directItems) {
       if (!chatList) return;
 
@@ -1596,7 +1613,9 @@
         if (!res.ok) return;
         const data = await res.json().catch(() => ({}));
         const direct = data?.direct || [];
+        const groups = data?.groups || [];
         applyDirectUnreadBadges(direct);
+        applyGroupUnreadBadges(groups);
         reorderDirectChatsByUnread(direct);
         applyPresenceFromSidebar(direct);
       } catch {
@@ -4470,12 +4489,44 @@
     function handleFileInput(input) {
       const f = input && input.files && input.files[0] ? input.files[0] : null;
       if (!f) return;
-      if (f.size > 10 * 1024 * 1024) {
+      acceptSelectedFile(f);
+    }
+
+    function acceptSelectedFile(file) {
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) {
         toast('File too large', 'Max 10MB');
         setSelectedFile(null);
         return;
       }
-      setSelectedFile(f);
+      setSelectedFile(file);
+    }
+
+    function normalizeClipboardFile(file) {
+      if (!file) return null;
+      const type = String(file.type || '').toLowerCase();
+      const extMap = {
+        'image/gif': 'gif',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/jpeg': 'jpg'
+      };
+      const ext = extMap[type] || (type.startsWith('image/') ? 'png' : '');
+      if (!ext) return file;
+      const name = String(file.name || '').toLowerCase();
+      if (name.endsWith(`.${ext}`)) return file;
+      return new File([file], `gboard-${Date.now()}.${ext}`, { type: file.type || 'image/png' });
+    }
+
+    function extractClipboardImage(event) {
+      const items = event?.clipboardData?.items ? Array.from(event.clipboardData.items) : [];
+      for (const item of items) {
+        const type = String(item.type || '').toLowerCase();
+        if (!type.startsWith('image/')) continue;
+        const f = item.getAsFile ? item.getAsFile() : null;
+        if (f) return normalizeClipboardFile(f);
+      }
+      return null;
     }
 
     if (attachBtn && attachInput) {
@@ -4484,6 +4535,33 @@
         handleFileInput(attachInput);
       });
     }
+
+    messageInput?.addEventListener('paste', (e) => {
+      const file = extractClipboardImage(e);
+      if (!file) return;
+      if (activeKind === 'group') {
+        toast('Attachments not supported for groups');
+        return;
+      }
+      e.preventDefault();
+      acceptSelectedFile(file);
+    });
+
+    composer?.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    composer?.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (activeKind === 'group') {
+        toast('Attachments not supported for groups');
+        return;
+      }
+      const files = Array.from(e.dataTransfer?.files || []);
+      const file = files[0] || null;
+      if (!file) return;
+      acceptSelectedFile(file);
+    });
 
     if (stickerBtn) {
       stickerBtn.addEventListener('click', () => {
@@ -5988,6 +6066,113 @@
           return data;
         }
 
+        const KERNEL_KEY_STORE = 'linkup_kernel_keys_v1';
+        const KERNEL_APPLY_AUTH_KEY = 'linkup_kernel_apply_ok_v1';
+        const KERNEL_PAGE_PATHS = {
+          chats: '/chats',
+          dashboard: '/dashboard',
+          support: '/support',
+          linkup_feedback: '/linkup/feedback'
+        };
+
+        function applyKernelPayload(css, js) {
+          let styleEl = document.getElementById('kernelStyle');
+          if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'kernelStyle';
+            document.head.appendChild(styleEl);
+          }
+          styleEl.textContent = css || '';
+
+          let scriptEl = document.getElementById('kernelScript');
+          if (!scriptEl) {
+            scriptEl = document.createElement('script');
+            scriptEl.id = 'kernelScript';
+            document.body.appendChild(scriptEl);
+          }
+          scriptEl.textContent = js || '';
+        }
+
+        function clearKernelPayload() {
+          const styleEl = document.getElementById('kernelStyle');
+          if (styleEl) styleEl.textContent = '';
+          const scriptEl = document.getElementById('kernelScript');
+          if (scriptEl) scriptEl.textContent = '';
+        }
+
+        function loadKernelKeyMap() {
+          try {
+            const raw = localStorage.getItem(KERNEL_KEY_STORE);
+            const data = raw ? JSON.parse(raw) : {};
+            return data && typeof data === 'object' ? data : {};
+          } catch {
+            return {};
+          }
+        }
+
+        function saveKernelKeyMap(map) {
+          try {
+            localStorage.setItem(KERNEL_KEY_STORE, JSON.stringify(map || {}));
+          } catch {
+            // ignore
+          }
+        }
+
+        function clearKernelLocalPreview(page) {
+          if (!page) return;
+          try { localStorage.removeItem(`linkup_kernel_css:${page}`); } catch {}
+          try { localStorage.removeItem(`linkup_kernel_js:${page}`); } catch {}
+        }
+
+        function ensureKernelApplyAuth(onAuthed) {
+          try {
+            if (sessionStorage.getItem(KERNEL_APPLY_AUTH_KEY) === '1') {
+              if (typeof onAuthed === 'function') onAuthed();
+              return;
+            }
+          } catch {}
+
+          openDialog('Confirm LinkUp password', `
+            <div class="dlg-card">
+              <div class="dlg-sec">Security check</div>
+              <p style="margin: 8px 0; font-size: 14px; opacity: 0.8;">
+                Enter your LinkUp password to apply Kernel keys.
+              </p>
+              <input class="dlg-input" id="kernelApplyPassword" type="password" placeholder="LinkUp password" />
+              <div class="kernel-key-status" id="kernelApplyStatus"></div>
+              <div class="dlg-actions">
+                <button class="btn" type="button" id="kernelApplyCancel">Cancel</button>
+                <button class="btn primary" type="button" id="kernelApplyConfirm">Confirm</button>
+              </div>
+            </div>
+          `);
+
+          setDialogBack(true, openSettingsMain);
+
+          document.getElementById('kernelApplyCancel')?.addEventListener('click', () => {
+            openSettingsMain();
+          });
+
+          document.getElementById('kernelApplyConfirm')?.addEventListener('click', async () => {
+            const password = String(document.getElementById('kernelApplyPassword')?.value || '').trim();
+            const status = document.getElementById('kernelApplyStatus');
+            if (!password) {
+              if (status) status.textContent = 'Enter your password.';
+              return;
+            }
+            try {
+              await apiJson('/api/account/verify-password', { password });
+              try { sessionStorage.setItem(KERNEL_APPLY_AUTH_KEY, '1'); } catch {}
+              openSettingsMain();
+              if (typeof onAuthed === 'function') {
+                setTimeout(() => onAuthed(), 0);
+              }
+            } catch (e) {
+              if (status) status.textContent = e.message || 'Invalid password.';
+            }
+          });
+        }
+
         function mountSettingsMain() {
           setDialogBack(false, null);
 
@@ -6044,6 +6229,93 @@
               toast('Profile unavailable', e.message || 'Try again');
             }
           });
+
+          const kernelPageSelect = document.getElementById('kernelKeyPage');
+          const kernelKeyInput = document.getElementById('kernelKeyInput');
+          const kernelKeyStatus = document.getElementById('kernelKeyStatus');
+          const kernelMap = loadKernelKeyMap();
+
+          function syncKernelKeyUi() {
+            const page = String(kernelPageSelect?.value || '').trim();
+            const key = page ? String(kernelMap[page] || '') : '';
+            if (kernelKeyInput) kernelKeyInput.value = key;
+            if (kernelKeyStatus) {
+              kernelKeyStatus.textContent = key
+                ? `Key stored for ${page.replace(/_/g, ' ')}.`
+                : 'No key saved.';
+            }
+          }
+
+          kernelPageSelect?.addEventListener('change', syncKernelKeyUi);
+          syncKernelKeyUi();
+
+          function performKernelKeySave() {
+            const page = String(document.getElementById('kernelKeyPage')?.value || '').trim();
+            const key = String(document.getElementById('kernelKeyInput')?.value || '').trim();
+            const status = document.getElementById('kernelKeyStatus');
+            if (!page || !key) {
+              if (status) status.textContent = 'Pick a page and paste a key.';
+              return;
+            }
+            const map = loadKernelKeyMap();
+            map[page] = key;
+            saveKernelKeyMap(map);
+            kernelMap[page] = key;
+            if (status) status.textContent = `Saved for ${page.replace(/_/g, ' ')}.`;
+            toast('Kernel key saved');
+            const targetPath = KERNEL_PAGE_PATHS[page];
+            if (targetPath && window.location.pathname.startsWith(targetPath)) {
+              fetch(`/api/kernel/key/apply?key=${encodeURIComponent(key)}&page=${encodeURIComponent(page)}`)
+                .then((res) => res.json().catch(() => ({})))
+                .then((data) => {
+                  if (!data || !data.ok) return;
+                  applyKernelPayload(data.css || '', data.js || '');
+                })
+                .catch(() => {});
+            }
+          }
+
+          document.getElementById('kernelKeySave')?.addEventListener('click', () => {
+            ensureKernelApplyAuth(performKernelKeySave);
+          });
+
+          document.getElementById('kernelKeyClear')?.addEventListener('click', () => {
+            const page = String(document.getElementById('kernelKeyPage')?.value || '').trim();
+            const input = document.getElementById('kernelKeyInput');
+            const status = document.getElementById('kernelKeyStatus');
+            if (!page) return;
+            const map = loadKernelKeyMap();
+            delete map[page];
+            saveKernelKeyMap(map);
+            delete kernelMap[page];
+            clearKernelLocalPreview(page);
+            if (input) input.value = '';
+            if (status) status.textContent = `Reset for ${page.replace(/_/g, ' ')}.`;
+            toast('Kernel key reset');
+            const targetPath = KERNEL_PAGE_PATHS[page];
+            if (targetPath && window.location.pathname.startsWith(targetPath)) {
+              clearKernelPayload();
+            }
+          });
+
+          document.getElementById('kernelKeyPeek')?.addEventListener('click', async () => {
+            const key = String(document.getElementById('kernelKeyInput')?.value || '').trim();
+            const status = document.getElementById('kernelKeyStatus');
+            if (!key) {
+              if (status) status.textContent = 'Paste a key first.';
+              return;
+            }
+            try {
+              const res = await fetch(`/api/kernel/key/peek?key=${encodeURIComponent(key)}`);
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(data.error || 'Invalid key');
+              const pageEl = document.getElementById('kernelKeyPage');
+              if (pageEl && data.page) pageEl.value = data.page;
+              if (status) status.textContent = `Key valid for ${String(data.page || '').replace(/_/g, ' ')}.`;
+            } catch (e) {
+              if (status) status.textContent = e.message || 'Key check failed.';
+            }
+          });
         }
 
         function openSettingsMain() {
@@ -6097,6 +6369,32 @@
                   </div>
                 </div>
                 <button class="btn" type="button" id="copyUsername">Copy</button>
+              </div>
+            </div>
+
+            <div class="dlg-card">
+              <div class="dlg-sec">Kernel key</div>
+              <div class="row" style="margin-top:0;">
+                <div style="display:flex; gap:12px; align-items:center; min-width:0;">
+                  <div class="row-ico" aria-hidden="true">🔑</div>
+                  <div class="left">
+                    <strong>Apply Kernel edits</strong>
+                    <span>Paste a key from Kernel to apply a page edit</span>
+                  </div>
+                </div>
+                <button class="btn" type="button" id="kernelKeyPeek">Check</button>
+              </div>
+              <select class="dlg-input" id="kernelKeyPage">
+                <option value="chats">Chats</option>
+                <option value="dashboard">Dashboard</option>
+                <option value="support">Support</option>
+                <option value="linkup_feedback">Feedback</option>
+              </select>
+              <input class="dlg-input" id="kernelKeyInput" placeholder="Paste kernel key" />
+              <div class="kernel-key-status" id="kernelKeyStatus">No key saved.</div>
+              <div class="dlg-actions">
+                <button class="btn" type="button" id="kernelKeyClear">Reset</button>
+                <button class="btn primary" type="button" id="kernelKeySave">Save</button>
               </div>
             </div>
 

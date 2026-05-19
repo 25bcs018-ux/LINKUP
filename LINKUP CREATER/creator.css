@@ -62,6 +62,7 @@ body.theme-light .profile-dropdown {
 .sidebar-logo {
   width: 38px; height: 38px;
   margin-bottom: 2px;
+  display: block;
 }
 .sidebar-brand span {
   font-size: 11px;

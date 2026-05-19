@@ -9,6 +9,7 @@
   let isDragging = false;
   let dragStart = null;
   let movedEnough = false;
+  let tapHandled = false;
 
   function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
@@ -74,6 +75,10 @@
   }
 
   button?.addEventListener('click', () => {
+    if (tapHandled) {
+      tapHandled = false;
+      return;
+    }
     if (movedEnough) {
       movedEnough = false;
       return;
@@ -87,6 +92,7 @@
 
   button?.addEventListener('pointerdown', (event) => {
     if (!button) return;
+    if (event.button && event.button !== 0) return;
     isDragging = true;
     movedEnough = false;
     button.setPointerCapture(event.pointerId);
@@ -94,6 +100,8 @@
     dragStart = {
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
+      startX: event.clientX,
+      startY: event.clientY,
     };
   });
 
@@ -102,9 +110,9 @@
     const nextX = event.clientX - dragStart.offsetX;
     const nextY = event.clientY - dragStart.offsetY;
     if (!movedEnough) {
-      const dx = Math.abs(nextX - (parseFloat(button.style.left) || 0));
-      const dy = Math.abs(nextY - (parseFloat(button.style.top) || 0));
-      if (dx > 3 || dy > 3) movedEnough = true;
+      const dx = Math.abs(event.clientX - dragStart.startX);
+      const dy = Math.abs(event.clientY - dragStart.startY);
+      if (dx > 6 || dy > 6) movedEnough = true;
     }
     applyPosition(nextX, nextY);
   });
@@ -112,11 +120,29 @@
   button?.addEventListener('pointerup', (event) => {
     if (!isDragging) return;
     isDragging = false;
+    const shouldToggle = !movedEnough;
     dragStart = null;
     button.releasePointerCapture(event.pointerId);
+    if (shouldToggle) {
+      tapHandled = true;
+      movedEnough = false;
+      if (panel?.classList.contains('is-open')) {
+        closePanel();
+      } else {
+        openPanel();
+      }
+      return;
+    }
     const x = parseFloat(button.style.left) || 12;
     const y = parseFloat(button.style.top) || 12;
     storePosition(x, y);
+  });
+
+  button?.addEventListener('pointercancel', (event) => {
+    if (!isDragging) return;
+    isDragging = false;
+    dragStart = null;
+    try { button.releasePointerCapture(event.pointerId); } catch {}
   });
 
   window.addEventListener('resize', () => {

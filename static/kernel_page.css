@@ -24,6 +24,15 @@ body.kernel-body {
   font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif;
 }
 
+.kernel-auth .kernel-top-actions,
+.kernel-auth .kernel-side {
+  display: none;
+}
+
+.kernel-auth .kernel-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 body.kernel-body::before {
   content: '';
   position: absolute;
@@ -89,6 +98,12 @@ body.kernel-body::before {
   align-items: center;
   justify-content: center;
   letter-spacing: 0.04em;
+}
+
+.kernel-symbol-img {
+  width: 36px;
+  height: 36px;
+  display: block;
 }
 
 .kernel-title {
@@ -171,6 +186,49 @@ body.kernel-body::before {
   margin-top: 10px;
 }
 
+.kernel-methods {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.kernel-method-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px dashed var(--kernel-stroke);
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.kernel-history {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.kernel-history-row {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.kernel-history-key {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  word-break: break-all;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
 .kernel-row {
   display: grid;
   gap: 10px;
@@ -191,6 +249,27 @@ body.kernel-body::before {
 .kernel-textarea {
   min-height: 200px;
   resize: vertical;
+}
+
+.kernel-textarea.code {
+  font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  min-height: 220px;
+}
+
+.kernel-key-box {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px dashed var(--kernel-stroke);
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.kernel-key-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .kernel-btn {
