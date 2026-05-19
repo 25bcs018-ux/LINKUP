@@ -1,4 +1,11 @@
 (() => {
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarsePointer = window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover: none)').matches;
+  const lowMemory = typeof navigator !== 'undefined' && navigator.deviceMemory && navigator.deviceMemory <= 4;
+  if (prefersReducedMotion || coarsePointer || lowMemory) {
+    document.body.classList.add('perf-mode');
+  }
+
   const root = document.querySelector('[data-app-switcher]');
   if (!root) return;
 
@@ -79,10 +86,6 @@
       tapHandled = false;
       return;
     }
-    if (movedEnough) {
-      movedEnough = false;
-      return;
-    }
     if (panel?.classList.contains('is-open')) {
       closePanel();
     } else {
@@ -112,7 +115,7 @@
     if (!movedEnough) {
       const dx = Math.abs(event.clientX - dragStart.startX);
       const dy = Math.abs(event.clientY - dragStart.startY);
-      if (dx > 6 || dy > 6) movedEnough = true;
+      if (dx > 12 || dy > 12) movedEnough = true;
     }
     applyPosition(nextX, nextY);
   });
@@ -133,6 +136,7 @@
       }
       return;
     }
+    tapHandled = true;
     const x = parseFloat(button.style.left) || 12;
     const y = parseFloat(button.style.top) || 12;
     storePosition(x, y);

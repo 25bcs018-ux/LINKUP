@@ -7,6 +7,20 @@
   --app-switcher-accent: rgba(107, 183, 255, 0.9);
 }
 
+body.perf-mode * {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  scroll-behavior: auto !important;
+  backdrop-filter: none !important;
+}
+
+body.perf-mode .app-switcher-btn,
+body.perf-mode .app-switcher-dot,
+body.perf-mode .app-switcher-item {
+  animation: none !important;
+}
+
 .app-switcher {
   position: fixed;
   left: 0;
