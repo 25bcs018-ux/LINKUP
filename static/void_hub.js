@@ -3,6 +3,12 @@
     requestAnimationFrame(() => document.body.classList.add('void-enter'));
   });
 
+  window.addEventListener('pageshow', () => {
+    document.body.classList.remove('void-app-launching');
+    document.querySelectorAll('.app-launch-overlay').forEach((el) => el.remove());
+    isLaunching = false;
+  });
+
   const tabs = Array.from(document.querySelectorAll('.app-tab'));
   const titleEl = document.getElementById('appTitle');
   const descEl = document.getElementById('appDesc');
@@ -26,6 +32,7 @@
   const tourBack = document.getElementById('voidTourBack');
   const tourNext = document.getElementById('voidTourNext');
   const tourSkip = document.getElementById('voidTourSkip');
+  let isLaunching = false;
 
   const usageKeys = ['linkup', 'secure', 'kernel', 'creator'];
 
@@ -159,20 +166,86 @@
     }
   }
 
+  function launchApp(tab, href) {
+    if (!tab || !href) return;
+    if (isLaunching) return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      window.location.href = href;
+      return;
+    }
+
+    isLaunching = true;
+
+    const logo = tab.querySelector('.app-logo');
+    const rect = (logo || tab).getBoundingClientRect();
+    const overlay = document.createElement('div');
+    overlay.className = 'app-launch-overlay';
+    overlay.style.left = `${rect.left}px`;
+    overlay.style.top = `${rect.top}px`;
+    overlay.style.width = `${rect.width}px`;
+    overlay.style.height = `${rect.height}px`;
+    overlay.style.borderRadius = getComputedStyle(logo || tab).borderRadius || '16px';
+
+    const logoWrap = document.createElement('div');
+    logoWrap.className = 'app-launch-logo';
+    if (logo) logoWrap.innerHTML = logo.innerHTML;
+    overlay.appendChild(logoWrap);
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const deltaX = (viewportWidth / 2) - centerX;
+    const deltaY = (viewportHeight / 2) - centerY;
+    const scale = 1.6;
+
+    overlay.style.setProperty(
+      '--target-transform',
+      `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scale})`
+    );
+
+    try {
+      localStorage.setItem('void_app_launch_v1', JSON.stringify({
+        app: tab.dataset.app || '',
+        html: logo ? logo.innerHTML : '',
+        w: rect.width,
+        h: rect.height,
+        radius: overlay.style.borderRadius,
+        t: Date.now()
+      }));
+    } catch {
+      // ignore storage failures
+    }
+
+    document.body.classList.add('void-app-launching');
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        overlay.classList.add('is-active');
+      });
+    });
+
+    window.setTimeout(() => {
+      window.location.href = href;
+    }, 2000);
+  }
+
   tabs.forEach((tab) => {
     tab.addEventListener('mouseenter', () => setActive(tab));
     tab.addEventListener('focus', () => setActive(tab));
     tab.addEventListener('click', () => {
       const href = tab.dataset.href || '';
       recordAppUse(tab.dataset.app || '');
-      if (href) window.location.href = href;
+      if (href) launchApp(tab, href);
     });
     tab.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         const href = tab.dataset.href || '';
         recordAppUse(tab.dataset.app || '');
-        if (href) window.location.href = href;
+        if (href) launchApp(tab, href);
       }
     });
   });

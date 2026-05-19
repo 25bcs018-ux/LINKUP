@@ -6,9 +6,10 @@
   <meta name="csrf-token" content="{{ csrf_token }}" />
   <title>Creator Studio</title>
   <link rel="stylesheet" href="/creator/creator.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='void_launch.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='app_switcher.css') }}" />
 </head>
-<body class="{% if not void_user %}has-auth-gate{% endif %}">
+<body class="{% if not void_user %}has-auth-gate{% endif %}" data-void-launch-app="creator" data-void-launch-target=".brand-mark">
 
   <div class="aurora"></div>
   <div class="grid-noise"></div>
@@ -30,7 +31,7 @@
   <!-- Sidebar Navigation -->
   <nav class="studio-sidebar" id="studioSidebar">
     <div class="sidebar-brand">
-      <svg class="sidebar-logo" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#62e6d9" opacity="0.18"/><text x="32" y="40" text-anchor="middle" font-size="28" fill="#62e6d9" font-family="Oxanium, Space Grotesk, sans-serif">L</text></svg>
+      <img class="sidebar-logo" src="{{ url_for('static', filename='brand/creator-logo.svg') }}" alt="" />
       <span>Creator Studio</span>
     </div>
     <ul class="sidebar-nav">
@@ -61,20 +62,7 @@
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true">
-        <svg class="brand-logo" viewBox="0 0 64 64" role="img" aria-hidden="true">
-          <defs>
-            <linearGradient id="studioGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="currentColor" stop-opacity="0.95" />
-              <stop offset="100%" stop-color="currentColor" stop-opacity="0.6" />
-            </linearGradient>
-          </defs>
-          <rect x="6" y="6" width="52" height="52" rx="14" fill="none" stroke="currentColor" stroke-width="3" opacity="0.55" />
-          <path d="M20 34c0 6 4.8 10 12 10s12-4 12-10" fill="none" stroke="url(#studioGlow)" stroke-width="4" stroke-linecap="round" />
-          <path d="M24 26c2-4.8 6.2-7.2 12-7.2s10 2.4 12 7.2" fill="none" stroke="url(#studioGlow)" stroke-width="4" stroke-linecap="round" />
-          <circle cx="22" cy="32" r="5" fill="currentColor" opacity="0.9" />
-          <circle cx="42" cy="32" r="5" fill="currentColor" opacity="0.9" />
-          <path d="M30 32h4" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.8" />
-        </svg>
+        <img class="brand-logo" src="{{ url_for('static', filename='brand/creator-logo.svg') }}" alt="" />
       </div>
       <div>
         <div class="brand-name">Creator</div>
@@ -474,6 +462,7 @@
 
   {% include "partials/app_switcher.html" %}
   <script src="/creator/creator.js"></script>
+  <script defer src="{{ url_for('static', filename='void_launch.js') }}"></script>
   <script defer src="{{ url_for('static', filename='app_switcher.js') }}"></script>
 </body>
 </html>

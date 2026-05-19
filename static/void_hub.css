@@ -33,6 +33,7 @@ body.void-modal-open {
   overflow: hidden;
 }
 
+
 .void-bg {
   position: fixed;
   inset: 0;
@@ -92,6 +93,7 @@ body.void-modal-open {
   background: radial-gradient(75% 65% at 50% 30%, transparent 55%, rgba(0, 0, 0, 0.85) 100%);
   opacity: 0.9;
 }
+
 
 .void-hub {
   position: relative;
@@ -662,7 +664,7 @@ body.void-modal-open {
   border: 1px solid rgba(107, 183, 255, 0.16);
   color: inherit;
   cursor: pointer;
-  opacity: 0;
+  opacity: 1;
   transform: translateY(20px) scale(0.98);
   animation: cardIn 600ms ease forwards, appTabHover 0.4s ease-in-out infinite;
   animation-delay: var(--delay, 0ms), var(--delay, 0ms);
@@ -701,13 +703,7 @@ body.void-modal-open {
 }
 
 .secure-logo::before {
-  content: '';
-  width: 26px;
-  height: 30px;
-  border-radius: 10px 10px 12px 12px;
-  border: 2px solid rgba(107, 183, 255, 0.8);
-  border-bottom-width: 3px;
-  display: block;
+  content: none;
 }
 
 .kernel-logo {

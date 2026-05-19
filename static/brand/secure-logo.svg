@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Secure logo">
+  <defs>
+    <linearGradient id="secureGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c7fff7" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#6ee7d8" stop-opacity="0.7" />
+    </linearGradient>
+  </defs>
+  <path d="M32 8l18 6v16c0 12-7.8 22.4-18 26-10.2-3.6-18-14-18-26V14l18-6z" fill="none" stroke="url(#secureGlow)" stroke-width="3" stroke-linejoin="round" />
+  <rect x="22" y="28" width="20" height="16" rx="6" fill="none" stroke="#e8fffb" stroke-width="3" />
+  <path d="M26 28v-4a6 6 0 0 1 12 0v4" fill="none" stroke="#e8fffb" stroke-width="3" stroke-linecap="round" />
+</svg>

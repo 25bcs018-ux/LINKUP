@@ -14,6 +14,8 @@
   const novaChips = document.getElementById('novaChips');
 
   const context = (document.body?.dataset?.novaContext || '').trim() || 'general';
+  const guestContexts = new Set(['front', 'auth', 'legal', 'support', 'verify', 'secure', 'general']);
+  const isGuestContext = guestContexts.has(context);
   const stateKey = 'linkup_nova_open';
   const guestKey = 'linkup_nova_guest_history_v1';
   const guestMergeKey = 'linkup_nova_guest_merge_prompted_v1';
@@ -203,6 +205,11 @@
 
   async function refreshNovaMessages() {
     if (!novaOpen || !novaMessages) return false;
+    if (isGuestContext) {
+      isGuestMode = true;
+      renderNovaMessages(guestHistoryForRender());
+      return true;
+    }
     if (isGuestMode) {
       renderNovaMessages(guestHistoryForRender());
       return true;
@@ -336,6 +343,47 @@
     isGuestMode = false;
   }
 
+  function respondGuestNova(text) {
+    const t = String(text || '').toLowerCase().trim();
+    const replies = [
+      {
+        test: (v) => v.includes('what is linkup') || v.includes('what is link up') || v.includes('linkup?'),
+        reply: 'LinkUp is a fast, simple chat app for everyday conversations.'
+      },
+      {
+        test: (v) => v.includes('create') && v.includes('account'),
+        reply: 'Tap "Create account" and fill in a username, email, and password.'
+      },
+      {
+        test: (v) => v.includes('sign in') || v.includes('login'),
+        reply: 'Use your username or email and password to sign in.'
+      },
+      {
+        test: (v) => v.includes('privacy'),
+        reply: 'You can read the privacy summary on the Privacy page.'
+      },
+      {
+        test: (v) => v.includes('terms') || v.includes('policy'),
+        reply: 'The Terms page has the key rules and usage guidelines.'
+      },
+      {
+        test: (v) => v.includes('secure'),
+        reply: 'LinkUp Secure lets you create or join a protected chat space.'
+      },
+      {
+        test: (v) => v.includes('creator'),
+        reply: 'Creator is the studio for layouts and visual changes.'
+      },
+      {
+        test: (v) => v.includes('support') || v.includes('help'),
+        reply: 'Open Support to report an issue or get troubleshooting steps.'
+      }
+    ];
+    const matched = replies.find((entry) => entry.test(t));
+    if (matched) return matched.reply;
+    return 'I am in guest mode. Ask about LinkUp, login, accounts, privacy, or secure mode.';
+  }
+
   async function sendNovaGuestMessage(content) {
     addGuestMessage('user', content);
     const history = loadGuestHistory().slice(-8).map((item) => ({
@@ -360,6 +408,16 @@
   async function submitNova(text) {
     const submitted = (text || '').trim();
     if (!submitted) return;
+
+    if (isGuestContext) {
+      addGuestMessage('user', submitted);
+      const reply = respondGuestNova(submitted);
+      addGuestMessage('assistant', reply);
+      isGuestMode = true;
+      renderNovaMessages(guestHistoryForRender());
+      if (novaInput) novaInput.value = '';
+      return;
+    }
 
     if (submitted === '/merge' || submitted.toLowerCase() === 'merge guest') {
       try {

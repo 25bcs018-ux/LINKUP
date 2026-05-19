@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VOID • Hub</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='void_launch.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='void_hub.css') }}" />
 </head>
 <body data-void-username="{{ void_user.username if void_user else '' }}"
@@ -115,7 +116,9 @@
         <button class="app-tab" type="button" role="tab" aria-selected="false"
           data-app="secure" data-title="Secure" data-desc="Private vaults and sealed chats."
           data-href="{{ url_for('linkup_secure.home') }}" style="--delay: 120ms;">
-          <span class="app-logo secure-logo" aria-hidden="true"></span>
+          <span class="app-logo secure-logo" aria-hidden="true">
+            <img src="{{ url_for('static', filename='brand/secure-logo.svg') }}" alt="" />
+          </span>
           <span class="app-name">
             Secure
             <span class="app-tag">Beta</span>
@@ -126,7 +129,7 @@
                 data-app="kernel" data-title="Kernel" data-desc="Systems control and operator tools."
                 data-href="/kernel" style="--delay: 240ms;">
           <span class="app-logo kernel-logo" aria-hidden="true">
-            <span class="kernel-symbol-core">K</span>
+            <img src="{{ url_for('static', filename='brand/kernel-logo.svg') }}" alt="" />
           </span>
           <span class="app-name">
             Kernel
@@ -138,10 +141,7 @@
                 data-app="creator" data-title="Creator" data-desc="Design, media, and build tools."
           data-href="{{ url_for('creator_login') }}" style="--delay: 360ms;">
           <span class="app-logo creator-logo" aria-hidden="true">
-            <svg viewBox="0 0 64 64" aria-hidden="true">
-              <circle cx="32" cy="32" r="28" fill="#62e6d9" opacity="0.18" />
-              <text x="32" y="40" text-anchor="middle" font-size="28" fill="#62e6d9" font-family="Oxanium, Space Grotesk, sans-serif">L</text>
-            </svg>
+            <img src="{{ url_for('static', filename='brand/creator-logo.svg') }}" alt="" />
           </span>
           <span class="app-name">
             Creator

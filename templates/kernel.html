@@ -13,16 +13,17 @@
   <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}" />
   <link rel="icon" href="{{ url_for('static', filename='brand/void-logo.png') }}" type="image/png" />
   <link rel="stylesheet" href="{{ url_for('static', filename='kernel_page.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='void_launch.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='app_switcher.css') }}" />
   <script defer src="{{ url_for('static', filename='theme.js') }}"></script>
   <script defer src="{{ url_for('static', filename='kernel_page.js') }}"></script>
 </head>
-<body class="kernel-body">
+<body class="kernel-body" data-void-launch-app="kernel" data-void-launch-target=".kernel-symbol">
   <div class="kernel-shell" id="kernelApp">
     <header class="kernel-top">
       <div class="kernel-brand">
         <div class="kernel-symbol" aria-hidden="true">
-          <span class="kernel-symbol-core">K</span>
+          <img class="kernel-symbol-img" src="{{ url_for('static', filename='brand/kernel-logo.svg') }}" alt="" />
         </div>
         <div class="kernel-brand-text">
           <div class="kernel-title">KERNEL</div>
@@ -30,18 +31,6 @@
         </div>
       </div>
       <div class="kernel-top-actions">
-        <a class="kernel-link" href="{{ url_for('void_sso', app='kernel') }}">Login with VOID</a>
-        <label class="kernel-label" for="kernelPageSelect">Target page</label>
-        <select class="kernel-select" id="kernelPageSelect">
-          <option value="chats" selected>Chats</option>
-          <option value="dashboard">Dashboard</option>
-          <option value="front">Front</option>
-          <option value="support">Support</option>
-          <option value="privacy">Privacy</option>
-          <option value="terms">Terms</option>
-          <option value="login">Login</option>
-          <option value="register">Register</option>
-        </select>
         <a class="kernel-link" href="{{ url_for('chats') }}">Back to Chats</a>
       </div>
     </header>
@@ -54,15 +43,10 @@
         <div class="kernel-card">
           <strong>Quick tips</strong>
           <ul class="kernel-list">
-            <li>Use Visual Mode to click and reposition any element on this page.</li>
-            <li>Save local to keep changes on this device only.</li>
-            <li>Connect to LinkUp to enable permanent per-user CSS.</li>
+            <li>Pick Visual method to edit without code.</li>
+            <li>Publish keys after saving changes in the editor.</li>
+            <li>Use history to reveal past keys.</li>
           </ul>
-        </div>
-        <div class="kernel-card">
-          <strong>Open target</strong>
-          <p class="kernel-muted">Launch the selected page in a new tab for quick checks.</p>
-          <button class="kernel-btn" id="kernelOpenTarget" type="button">Open target page</button>
         </div>
         <div class="kernel-card">
           <strong>Status</strong>
@@ -72,6 +56,7 @@
     </div>
   </div>
   {% include "partials/app_switcher.html" %}
+  <script defer src="{{ url_for('static', filename='void_launch.js') }}"></script>
   <script defer src="{{ url_for('static', filename='app_switcher.js') }}"></script>
 </body>
 </html>

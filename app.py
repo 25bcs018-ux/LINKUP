@@ -957,7 +957,7 @@ def _ensure_group_image_columns() -> None:
     """Best-effort SQLite migration for group image fields."""
     try:
         with app.app_context():
-            cols = [r[1] for r in db.session.execute(text('PRAGMA table_info(group)')).fetchall()]
+            cols = [r[1] for r in db.session.execute(text('PRAGMA table_info("group")')).fetchall()]
             if not cols:
                 return
 
@@ -2969,7 +2969,7 @@ def register_page():
 def login():
     if request.method == 'POST':
         identifier = (request.form.get('username') or '').strip()
-        password = request.form.get('password')
+        password = request.form.get('password') or ''
         next_dest = (request.form.get('next') or '').strip().lower()
         using_void = next_dest == 'void_hub'
 
@@ -2977,7 +2977,7 @@ def login():
         if not user and '@' in identifier:
             user = _find_user_by_email(identifier)
         
-        if user and check_password_hash(user.password, password):
+        if user and user.password and check_password_hash(user.password, password):
             if _email_verification_required() and not getattr(user, 'email_verified', False):
                 return redirect(url_for('email_not_verified', username=user.username))
             _login_user(user)
@@ -5920,6 +5920,10 @@ def api_chats_sidebar():
         .filter(GroupMember.user_id == me.id)
         .all()
     )
+
+    group_states = {
+        int(s.group_id): s for s in GroupChatState.query.filter_by(user_id=int(me.id)).all()
+    }
 
     last_group_messages = {}
     group_unread_counts = {}
